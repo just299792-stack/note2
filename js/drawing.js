@@ -8,6 +8,7 @@ export const PAGE_W = 816;      // 逻辑页面宽 (pt)
 export const PAGE_H = 1056;     // 逻辑页面高 (pt)
 const RENDER_SCALE = 2;         // 页面光栅超采样
 const MIN_DIST = 1.1;           // 点抽稀最小距离(世界px)
+const LINE_H = 48;              // 横线行距(世界px)，荧光笔对齐用
 
 const PAPER_INFO = {
   white:  { bg: '#fffefb',  line: 'rgba(120,160,220,.35)',  grid: 'rgba(120,160,220,.30)',  dot: 'rgba(120,160,220,.45)',  dark: false, name: '白色' },
@@ -102,24 +103,31 @@ export function drawStroke(ctx, st, info, font) {
     ctx.restore();
     return;
   }
-  // 钢笔：平滑路径 + 圆头圆角（流畅实线，不呈点线）
+  // 钢笔：平滑描边 + 起收笔锋（细→粗→细）+ 圆头圆角
   const pts = st.points;
+  const n = pts.length;
   let sumP = 0;
-  for (let i = 0; i < pts.length; i++) sumP += pts[i].p || 1;
-  const avgP = Math.max(0.3, Math.min(1, sumP / pts.length));
-  ctx.strokeStyle = st.color;
-  ctx.lineWidth = Math.max(1.4, st.width * (0.45 + 0.55 * avgP));
+  for (let i = 0; i < n; i++) sumP += pts[i].p || 1;
+  const avgP = Math.max(0.3, Math.min(1, sumP / n));
+  const baseW = Math.max(1.6, st.width * (0.45 + 0.55 * avgP));
+  const taper = (t) => {
+    if (t < 0.12) return 0.35 + 0.65 * (t / 0.12);
+    if (t > 0.88) return 0.35 + 0.65 * ((1 - t) / 0.12);
+    return 1;
+  };
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length - 1; i++) {
-    const mx = (pts[i].x + pts[i + 1].x) / 2;
-    const my = (pts[i].y + pts[i + 1].y) / 2;
-    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  for (let i = 0; i < n - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const t = (i + 0.5) / (n - 1);
+    const w = baseW * taper(t) * (0.8 + 0.2 * (((a.p || 1) + (b.p || 1)) / 2));
+    ctx.strokeStyle = st.color;
+    ctx.lineWidth = Math.max(0.8, w);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
   }
-  ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -257,6 +265,15 @@ export class DrawingEngine {
   worldToScreen(wx, wy) { return { x: wx * this.scale + this.ox, y: wy * this.scale + this.oy }; }
 
   /* -------- 输入 -------- */
+  snapPoint(w, tool, pressure) {
+    const pt = { x: w.x, y: w.y, p: pressure };
+    const paper = this.cb.getPaper();
+    if (tool === 'highlighter' && paper.style === 'line') {
+      pt.y = Math.round(w.y / LINE_H) * LINE_H;
+    }
+    return pt;
+  }
+
   onPointerDown(e) {
     if (this.pointers.size >= 2) return;
     try { this.canvas.setPointerCapture?.(e.pointerId); } catch (_) {}
@@ -276,7 +293,7 @@ export class DrawingEngine {
         this.currentStroke = {
           id: 's' + Math.random().toString(36).slice(2, 10),
           tool: settings.tool, color: settings.color, width: settings.width,
-          points: [{ x: w.x, y: w.y, p: this.pressure(e) }]
+          points: [this.snapPoint(w, settings.tool, this.pressure(e))]
         };
         this.loupeOn = !!settings.loupe && settings.tool === 'pen';
         if (this.loupeEl) this.loupeEl.classList.remove('hidden');
@@ -313,7 +330,7 @@ export class DrawingEngine {
     const nx = Lp.x, ny = Lp.y;
 
     if (this.pointers.size === 2) { p.x = nx; p.y = ny; this.updateGesture(); return; }
-    if (this.gesture) { this.gesture = null; return; }
+    if (this.gesture) return;
 
     if (this.panning) {
       this.ox += nx - p.x; this.oy += ny - p.y;
@@ -328,8 +345,9 @@ export class DrawingEngine {
 
     if (pen) {
       const last = pen.points[pen.points.length - 1];
-      if (Math.hypot(w.x - last.x, w.y - last.y) >= MIN_DIST) {
-        pen.points.push({ x: w.x, y: w.y, p: this.pressure(e) });
+      const np = this.snapPoint(w, pen.tool, this.pressure(e));
+      if (Math.hypot(np.x - last.x, np.y - last.y) >= MIN_DIST) {
+        pen.points.push(np);
         this.updateLoupe(w, nx, ny);
         this.dirtyView = true;
       }
@@ -363,7 +381,17 @@ export class DrawingEngine {
     this.pointers.delete(e.pointerId);
     if (this.pointers.size >= 2) return;
 
-    if (this.gesture) { this.gesture = null; return; }
+    if (this.gesture) {
+      const g = this.gesture;
+      if (this.pointers.size === 0) {
+        this.gesture = null;
+        // 双指轻点 = 撤销
+        if (Date.now() - g.startTime < 320 && g.maxMove < 24) {
+          if (this.cb.onTwoFingerTap) this.cb.onTwoFingerTap();
+        }
+      }
+      return;
+    }
     if (this.panning) { this.panning = false; return; }
 
     if (this.currentStroke) {
@@ -417,7 +445,10 @@ export class DrawingEngine {
     this.gesture = {
       dist: Math.hypot(a.x - b.x, a.y - b.y),
       mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-      scale: this.scale, ox: this.ox, oy: this.oy
+      scale: this.scale, ox: this.ox, oy: this.oy,
+      startTime: Date.now(),
+      startA: { x: a.x, y: a.y }, startB: { x: b.x, y: b.y },
+      maxMove: 0
     };
     this.currentStroke = null; this.lassoPath = null; this.curShape = null; this.textTap = null;
     this.loupeOn = false;
@@ -432,6 +463,11 @@ export class DrawingEngine {
     const dist = Math.hypot(a.x - b.x, a.y - b.y);
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const g = this.gesture;
+    const move = Math.max(
+      Math.hypot(a.x - g.startA.x, a.y - g.startA.y),
+      Math.hypot(b.x - g.startB.x, b.y - g.startB.y)
+    );
+    if (move > g.maxMove) g.maxMove = move;
     if (dist > 0) {
       const ns = Math.max(0.25, Math.min(4, g.scale * (dist / g.dist)));
       this.scale = ns;
@@ -766,6 +802,8 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
+
 
 
 

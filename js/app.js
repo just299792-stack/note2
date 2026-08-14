@@ -47,7 +47,7 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
   getSettings: settings,
   getFont: () => FONT,
-  onStrokeDone: (st) => mutate(() => currentPage().strokes.push(st), '书写'),
+  onStrokeDone: (st) => { mutate(() => currentPage().strokes.push(st), '书写'); maybeAutoAdvance(st); },
   onShapeDone: (st) => mutate(() => currentPage().strokes.push(st), '形状'),
   onEraseDone: (ids) => mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除'),
   onLassoMoveStart: () => { moveBefore = pageSnapshot(currentPage()); },
@@ -61,9 +61,25 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     moveBefore = null;
     saveSoon(true);
   },
-  onTextTap: (w) => createTextEdit(w)
+  onTextTap: (w) => createTextEdit(w),
+  onTwoFingerTap: () => undo()
 });
 let moveBefore = null;
+
+/* ---------------- 自动翻页（写到页尾时） ---------------- */
+function maybeAutoAdvance(st) {
+  if (!st || st.shape) return;
+  let maxY = 0;
+  for (const p of st.points) maxY = Math.max(maxY, p.y);
+  if (maxY < PAGE_H * 0.94) return;
+  const note = currentNote();
+  if (!note) return;
+  if (state.pageIndex >= note.pages.length - 1) {
+    setTimeout(() => { addPage(); toast('已自动添加新页'); }, 200);
+  } else {
+    setTimeout(() => switchPage(state.pageIndex + 1), 200);
+  }
+}
 
 /* ---------------- 历史记录 ---------------- */
 function pageSnapshot(page) { return JSON.stringify({ s: page.strokes, t: page.texts }); }
@@ -1042,6 +1058,7 @@ async function init() {
 }
 
 init();
+
 
 
 

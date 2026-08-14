@@ -3,7 +3,7 @@
    ========================================================= */
 import { PAGE_W, PAGE_H } from './drawing.js';
 
-export const LIB_VERSION = 1;
+export const LIB_VERSION = 2;
 
 let _idc = 0;
 export function newId() {
@@ -25,7 +25,7 @@ export function newLibrary() {
   ];
   return {
     version: LIB_VERSION,
-    settings: { fingerDraw: false, loupe: true, tool: 'pen', color: '#1e293b', width: 5, shape: 'line' },
+    settings: { fingerDraw: false, loupe: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line' },
     subjects: [
       { id: subjId, name: '我的科目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [note.id] } ] }
     ],
@@ -135,7 +135,9 @@ export function sanitize(raw) {
   if (!raw || typeof raw !== 'object') return newLibrary();
   const lib = raw;
   lib.version = LIB_VERSION;
-  lib.settings = Object.assign({ fingerDraw: false, loupe: true, tool: 'pen', color: '#1e293b', width: 5, shape: 'line' }, lib.settings || {});
+  lib.settings = Object.assign({ fingerDraw: false, loupe: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line' }, lib.settings || {});
+  // v1 -> v2：旧版本默认关闭放大镜（用户仍可在菜单里打开）
+  if (raw.version < 2) lib.settings.loupe = false;
   if (!Array.isArray(lib.subjects) || lib.subjects.length === 0) {
     const subjId = newId(); const nbId = newId();
     lib.subjects = [{ id: subjId, name: '我的科目', notebooks: [{ id: nbId, name: '导入的笔记本', noteIds: [] }] }];
@@ -196,4 +198,5 @@ export function listNotes(lib, notebookId) {
   if (!f) return [];
   return f.notebook.noteIds.map(id => lib.notes[id]).filter(Boolean);
 }
+
 

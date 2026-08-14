@@ -1,5 +1,5 @@
 ﻿/* 手记 · Service Worker —— 离线可用 */
-const CACHE = 'note2-v2';
+const CACHE = 'note2-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -36,5 +36,6 @@ self.addEventListener('fetch', (e) => {
     }).catch(() => hit))
   );
 });
+
 
 
