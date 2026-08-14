@@ -145,6 +145,7 @@
         <button id="btnNewNote" class="mini-btn primary" title="新建笔记">＋ 笔记</button>
       </div>
       <div id="subjectList" class="subject-list"></div>
+      <div class="note-search-wrap"><svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg><input id="noteSearch" type="search" placeholder="搜索笔记" autocomplete="off"></div>
       <div id="noteList" class="note-list"></div>
       <div class="lib-foot">
         <button id="btnNewSubject" class="mini-btn">＋ 项目</button>
@@ -157,6 +158,12 @@
       <div id="paperHolder" class="paper-holder">
         <canvas id="viewCanvas"></canvas>
         <div id="textLayer" class="text-layer"></div>
+      </div>
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-icon"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg></div>
+        <div class="empty-title">还没有笔记</div>
+        <div class="empty-sub">点「＋ 笔记」新建一篇，或从左侧资料库打开</div>
+        <button id="btnEmptyNew" class="mini-btn primary">＋ 新建笔记</button>
       </div>
       <div id="pageNav" class="page-nav">
         <button id="btnPrevPage" class="icon-btn sm" aria-label="上一页"><svg viewBox="0 0 24 24" class="ic"><path d="M15 6l-6 6 6 6"/></svg></button>

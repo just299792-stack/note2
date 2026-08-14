@@ -592,3 +592,34 @@ body.toolbar-bottom .tool-btn { padding: 7px 10px 5px; }
 .ni-more:hover { background: var(--accent-soft); color: var(--accent); opacity: 1; }
 .ni-menu { min-width: 150px; z-index: 300; }
 .ni-menu .menu-item { gap: 8px; }
+
+/* ============ 体验优化：空状态 + 搜索 ============ */
+.empty-state {
+  position: absolute; inset: 0; z-index: 25;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  pointer-events: none; text-align: center;
+}
+.empty-state .empty-icon {
+  width: 72px; height: 72px; border-radius: 24px;
+  background: var(--accent-grad); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 12px 30px rgba(37,99,235,.35);
+  margin-bottom: 6px;
+}
+.empty-state .empty-icon .ic { width: 34px; height: 34px; }
+.empty-state .empty-title { font-family: var(--font-display); font-size: 20px; font-weight: 800; }
+.empty-state .empty-sub { font-size: 13px; color: var(--text-2); max-width: 260px; line-height: 1.6; }
+.empty-state .mini-btn { pointer-events: auto; margin-top: 4px; }
+
+.note-search-wrap {
+  display: flex; align-items: center; gap: 6px; margin: 2px 10px 8px;
+  padding: 7px 10px; border-radius: 10px;
+  background: var(--bg-elev2); border: 1px solid var(--border);
+}
+.note-search-wrap .ic { width: 16px; height: 16px; color: var(--text-3); flex: none; }
+.note-search-wrap input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font: 13px var(--font); color: var(--text);
+}
+.note-search-wrap input::placeholder { color: var(--text-3); }
+.note-search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }

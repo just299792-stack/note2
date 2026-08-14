@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.6';
+const APP_VERSION = '4.7';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -27,7 +27,9 @@ const state = {
   auth: null,
   authAvailable: false,
   rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [] },
-  recSupported: !!(navigator.mediaDevices && window.MediaRecorder)
+  recSupported: !!(navigator.mediaDevices && window.MediaRecorder),
+  searchQuery: '',
+  saving: false
 };
 let history = [];
 let histIdx = -1;
@@ -137,11 +139,13 @@ function updateHistoryUI() {
 function saveSoon(touch) {
   const note = currentNote();
   if (note && touch) note.updatedAt = Date.now();
+  state.saving = true;
   refreshTitleMeta();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    if (state.auth) api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) });
-    else saveLibrary(state.lib);
+    const done = () => { state.saving = false; refreshTitleMeta(); };
+    if (state.auth) api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) }).then(done).catch(done);
+    else Promise.resolve(saveLibrary(state.lib)).then(done);
   }, 350);
 }
 async function flushSave() {
@@ -173,6 +177,7 @@ function openNote(noteId, notebookId, subjectId, pageIndex) {
   state.lib.active = { subjectId: state.activeSubjectId, notebookId: state.activeNotebookId, noteId, pageIndex: state.pageIndex };
   stopPlayback();
   if (!$('#recPanel').classList.contains('hidden')) refreshRecList();
+  updateEmptyState();
   saveSoon();
 }
 
@@ -307,6 +312,7 @@ function bindUI() {
       updateToolUI();
       updateColorUI();
       if (state.tool === 'shape') { $('#colorPop').classList.remove('hidden'); }
+      else $('#colorPop').classList.add('hidden');
     });
   });
   // 颜色/粗细
@@ -360,6 +366,10 @@ function bindUI() {
   $('#recToggle').addEventListener('click', toggleRecording);
   $('#btnRec').classList.toggle('hidden', !state.recSupported);
   $('#btnNewNote').addEventListener('click', createNote);
+  const nsEl = $('#noteSearch');
+  if (nsEl) nsEl.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderNoteList(); });
+  const enEl = $('#btnEmptyNew');
+  if (enEl) enEl.addEventListener('click', createNote);
   $('#btnNewSubject').addEventListener('click', () => promptModal('新建项目', '', '项目名称', '创建', (name) => {
     if (!name) return;
     state.lib.subjects.push({ id: newId(), name, notebooks: [] });
@@ -522,7 +532,7 @@ function refreshTitleMeta() {
   const d = new Date(n.updatedAt);
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
-  $('#titleMeta').textContent = `${pages} 页 · ${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
+  $('#titleMeta').textContent = `${pages} 页 · ${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}` + (state.saving ? ' · 保存中…' : '');
 }
 
 function updatePaperUI() {
@@ -772,11 +782,18 @@ function renderLibrary() {
   renderNoteList();
 }
 
+function updateEmptyState() {
+  const el = $('#emptyState');
+  if (el) el.classList.toggle('hidden', !!currentNote());
+}
+
 function renderNoteList() {
   const root = $('#noteList');
   root.innerHTML = '';
   const f = findNotebook(state.lib, state.activeNotebookId);
-  const notes = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
+  let notes = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
+  const q = (state.searchQuery || '').trim().toLowerCase();
+  if (q) notes = notes.filter(n => n.title.toLowerCase().includes(q));
   notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   if (!notes.length) {
     const empty = document.createElement('div');
@@ -857,6 +874,7 @@ function deleteNote(noteId) {
       engine.setPage(null);
       engine.invalidateRaster();
       updatePageNav();
+      updateEmptyState();
     }
   }
   saveLibrary(state.lib);
@@ -1228,6 +1246,7 @@ function bootstrapUI() {
   engine.setPage(currentPage());
   engine.fitView();
   engine.invalidateRaster();
+  updateEmptyState();
 }
 
 /* ---------------- 录音 ---------------- */
@@ -1491,6 +1510,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
