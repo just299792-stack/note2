@@ -53,7 +53,9 @@ body {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
-input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+.note-title, .note-meta { -webkit-user-select: none; user-select: none; }
+.note-title[contenteditable="true"] { -webkit-user-select: text; user-select: text; }
 .ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 button { font-family: var(--font); border: none; background: none; color: inherit; cursor: pointer; }
 button:disabled { opacity: .35; pointer-events: none; }
@@ -750,3 +752,4 @@ button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .r
   font-size: 11px; color: var(--text-3); font-weight: 700;
   letter-spacing: .08em; padding: 10px 10px 2px;
 }
+
