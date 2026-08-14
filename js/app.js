@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.15';
+const APP_VERSION = '4.16';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -343,7 +343,7 @@ function deletePage() {
 
 /* ---------------- 文字工具 ---------------- */
 function createTextEdit(world) {
-  const fontSize = 26;
+  const fontSize = state.lib.settings.textSize || 26;
   const color = state.color;
   const item = { id: newId(), x: world.x / PAGE_W, y: world.y / PAGE_H, w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left' };
   const layer = $('#textLayer');
@@ -594,6 +594,16 @@ function bindUI() {
     if (e.key === 'PageDown') switchPage(state.pageIndex + 1);
     if (e.key === 'PageUp') switchPage(state.pageIndex - 1);
   });
+  // 导出快捷键（⌘/Ctrl + E 导出笔记，+P 导出 PDF，+Shift+P 导出当前页图片）
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'e' && !e.shiftKey) { e.preventDefault(); exportNote(); }
+    else if (k === 'p' && e.shiftKey) { e.preventDefault(); exportPagePng(); }
+    else if (k === 'p') { e.preventDefault(); exportPdf(); }
+  });
   window.addEventListener('beforeunload', () => flushSave());
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
   // 触控板返回手势兼容
@@ -772,6 +782,18 @@ function renderSettings() {
       b.textContent = label;
       b.addEventListener('click', () => { st.eraserMode = v; saveLibrary(state.lib); renderSettings(); });
       emEl.appendChild(b);
+    });
+  }
+  // 文字字号
+  const tsEl = $('#textSizeRow');
+  if (tsEl) {
+    tsEl.innerHTML = '';
+    [[18, '小'], [26, '中'], [34, '大']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.textSize || 26) === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.textSize = v; saveLibrary(state.lib); renderSettings(); });
+      tsEl.appendChild(b);
     });
   }
   // 圆珠笔默认色
@@ -2074,6 +2096,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
