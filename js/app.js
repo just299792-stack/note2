@@ -5,7 +5,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1005,7 +1005,10 @@ function bootstrapUI() {
 /* ---------------- 初始化 ---------------- */
 function registerSW() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // iOS 默认不勤检查更新：每次启动主动触发一次检查
+      navigator.serviceWorker.ready.then(() => reg.update()).catch(() => {});
+    }).catch(() => {});
   }
 }
 
@@ -1061,6 +1064,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
