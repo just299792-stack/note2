@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.22';
+const APP_VERSION = '4.23';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -61,7 +61,7 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   onStrokeDone: (st, holdMs) => {
     recCapture('stroke', st);
     const hold = holdMs || 0;
-    if (hold >= 450 && (st.tool === 'pen' || st.tool === 'ballpen')) {
+    if (hold >= 250 && (st.tool === 'pen' || st.tool === 'ballpen')) {
       const det = detectShape(st.points);
       if (det) {
         const shapeStroke = { id: st.id, tool: 'pen', shape: det.kind, color: st.color, width: st.width, points: det.points };
@@ -70,7 +70,7 @@ const engine = new DrawingEngine($('#viewCanvas'), {
           page.strokes = page.strokes.filter(s => s.id !== st.id);
           page.strokes.push(shapeStroke);
         }, '形状识别');
-        const names = { line: '直线', curve: '曲线', polygon: '多边形', ellipse: '椭圆' };
+        const names = { line: '直线', curve: '曲线', polygon: '多边形', ellipse: '椭圆', rect: '长方形', square: '正方形', circle: '圆形' };
         toast('已识别为' + (names[det.kind] || det.kind));
         maybeAutoAdvance(shapeStroke);
         return;
@@ -132,11 +132,16 @@ function detectShape(points) {
   const start = points[0], end = points[n - 1];
   const closed = Math.hypot(end.x - start.x, end.y - start.y) < diag * 0.18;
   const lineFit = fitLine(points);
-  if (!closed && lineFit.maxDev < diag * 0.06) {
+  if (!closed && lineFit.maxDev < diag * 0.09) {
     return { kind: 'line', points: [{ x: start.x, y: start.y }, { x: end.x, y: end.y }] };
   }
   if (closed) {
-    const corners = rdp(points, diag * 0.06);
+    // 长方形 / 正方形：点贴合包围盒边缘
+    if (rectFitOk(points, minX, minY, bw, bh, diag)) {
+      const aspect = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
+      return { kind: aspect < 1.15 ? 'square' : 'rect', points: [{ x: minX, y: minY }, { x: maxX, y: maxY }] };
+    }
+    const corners = rdp(points, diag * 0.08);
     if (corners.length >= 3 && corners.length <= 8 && polyFitOk(points, corners, diag)) {
       return { kind: 'polygon', points: corners };
     }
@@ -146,11 +151,12 @@ function detectShape(points) {
     const avgR = sumR / points.length;
     let maxDev = 0;
     for (const p of points) maxDev = Math.max(maxDev, Math.abs(Math.hypot(p.x - cx, p.y - cy) - avgR));
-    if (maxDev < diag * 0.11) {
-      return { kind: 'ellipse', points: [{ x: minX, y: minY }, { x: maxX, y: maxY }] };
+    if (maxDev < diag * 0.14) {
+      const aspect = Math.max(bw, bh) / Math.max(1, Math.min(bw, bh));
+      return { kind: aspect < 1.15 ? 'circle' : 'ellipse', points: [{ x: minX, y: minY }, { x: maxX, y: maxY }] };
     }
   }
-  if (!closed && lineFit.maxDev < diag * 0.35) {
+  if (!closed && lineFit.maxDev < diag * 0.45) {
     return { kind: 'curve', points: points.map(p => ({ x: p.x, y: p.y })) };
   }
   return null;
@@ -185,6 +191,26 @@ function rdp(pts, eps) {
     return left.slice(0, -1).concat(right);
   }
   return [pts[0], pts[n - 1]];
+}
+function rectFitOk(points, minX, minY, bw, bh, diag) {
+  const maxX = minX + bw, maxY = minY + bh;
+  let maxD = 0;
+  for (const p of points) {
+    const d = Math.min(Math.abs(p.y - minY), Math.abs(p.y - maxY), Math.abs(p.x - minX), Math.abs(p.x - maxX));
+    if (d > maxD) maxD = d;
+  }
+  if (maxD >= diag * 0.10) return false;
+  // 四角附近都要有点（排除圆形）
+  const tol = diag * 0.085;
+  const corners = [[minX, minY], [maxX, minY], [minX, maxY], [maxX, maxY]];
+  for (const [cxp, cyp] of corners) {
+    let ok = false;
+    for (const p of points) {
+      if (Math.hypot(p.x - cxp, p.y - cyp) < tol) { ok = true; break; }
+    }
+    if (!ok) return false;
+  }
+  return true;
 }
 function polyFitOk(points, polyPts, diag) {
   const m = polyPts.length;
@@ -2278,6 +2304,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 

@@ -179,11 +179,15 @@ export function drawShape(ctx, st) {
       ctx.lineTo(x2 - len * Math.cos(ang + 0.5), y2 - len * Math.sin(ang + 0.5));
       ctx.stroke();
     }
-  } else if (st.shape === 'rect') {
+  } else if (st.shape === 'rect' || st.shape === 'square') {
     ctx.rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
     ctx.stroke();
   } else if (st.shape === 'ellipse') {
     ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, 7);
+    ctx.stroke();
+  } else if (st.shape === 'circle') {
+    const rx = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 2;
+    ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, rx, rx, 0, 0, 7);
     ctx.stroke();
   } else if (st.shape === 'polygon') {
     const pts = st.points;
@@ -829,6 +833,7 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
 
 
 
