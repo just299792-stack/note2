@@ -161,14 +161,24 @@ function createAuth(options = {}) {
       return sendJson(res, 200, { user: { id: u.id, username: u.username } }), true;
     }
     if (p === '/api/library' && method === 'GET') {
-      const lib = readJson(userLibraryPath(auth.userId), null);
+      let lib = readJson(userLibraryPath(auth.userId), null);
+      if (lib === null) {
+        // 主文件缺失（如写入中断）时回退到上一版备份，绝不让客户端拿到空库
+        const bakPath = userLibraryPath(auth.userId) + '.bak';
+        if (fs.existsSync(bakPath)) lib = readJson(bakPath, null);
+      }
       return sendJson(res, 200, { library: lib }), true;
     }
     if (p === '/api/library' && method === 'PUT') {
       let data;
       try { data = JSON.parse(await readBody(req)); } catch { return sendJson(res, 400, { error: '数据格式错误' }), true; }
       if (!data || typeof data !== 'object') return sendJson(res, 400, { error: '数据格式错误' }), true;
-      writeJsonAtomic(userLibraryPath(auth.userId), data);
+      // 原子写入 + 保留上一版为 .bak（防升级/写入异常丢数据）
+      const target = userLibraryPath(auth.userId);
+      const tmp = target + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+      if (fs.existsSync(target)) fs.renameSync(target, target + '.bak');
+      fs.renameSync(tmp, target);
       return sendJson(res, 200, { ok: true }), true;
     }
 
@@ -179,4 +189,5 @@ function createAuth(options = {}) {
 }
 
 module.exports = { createAuth };
+
 

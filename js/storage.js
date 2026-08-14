@@ -139,10 +139,21 @@ export async function saveLibrary(lib) {
   }
 }
 
+/* 从本地备份恢复（读取失败/升级异常时的兜底） */
+export function loadLocalBackup() {
+  try {
+    const raw = localStorage.getItem('note2-backup');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed ? sanitize(parsed) : null;
+  } catch (_) { return null; }
+}
+
 /* ---------- 数据清洗 / 兼容导入 ---------- */
 export function sanitize(raw) {
   if (!raw || typeof raw !== 'object') return newLibrary();
   const lib = raw;
+  const fromVersion = Number(lib.version) || 1;
   lib.version = LIB_VERSION;
   lib.settings = Object.assign({
     fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
@@ -155,12 +166,14 @@ export function sanitize(raw) {
   if (!lib.settings.theme) lib.settings.theme = 'auto';
   if (!lib.settings.noteSort) lib.settings.noteSort = 'updated';
   if (!lib.settings.textSize) lib.settings.textSize = 26;
-  // v3 -> v4：工具栏默认改为顶部（尊重用户最新偏好）\n  if (raw.version < 4 && lib.settings.toolbar === 'left') lib.settings.toolbar = 'top';\n  // 迁移：旧 twoFingerUndo 开关 -> twoFingerAction
+  // v3 -> v4：工具栏默认改为顶部（尊重用户最新偏好）
+  if (fromVersion < 4 && lib.settings.toolbar === 'left') lib.settings.toolbar = 'top';
+  // 迁移：旧 twoFingerUndo 开关 -> twoFingerAction
   if (!lib.settings.twoFingerAction) {
     lib.settings.twoFingerAction = lib.settings.twoFingerUndo === false ? 'off' : 'undo';
   }
   // v1/v2 -> v3：彻底移除放大镜，补充新设置字段
-  if (raw.version < 3) {
+  if (fromVersion < 3) {
     delete lib.settings.loupe;
     if (!lib.settings.toolbar) lib.settings.toolbar = 'left';
     if (!lib.settings.eraserSize) lib.settings.eraserSize = 24;
@@ -303,6 +316,7 @@ export async function deleteRecTimeline(noteId, recId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 
 
 

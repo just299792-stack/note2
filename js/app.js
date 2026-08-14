@@ -1,13 +1,13 @@
 ﻿/* =========================================================
    笔记 —— 主应用
    ========================================================= */
-import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize, findNote, findNotebook,
+import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLocalBackup, sanitize, findNote, findNotebook,
   saveAudioBlob, getAudioBlob, deleteAudioBlob, saveRecMeta, getRecMeta,
   saveRecTimeline, getRecTimeline, deleteRecTimeline } from './storage.js';
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.23';
+const APP_VERSION = '4.24';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2246,19 +2246,36 @@ function registerSW() {
 }
 
 async function init() {
-  let lib = await loadLibrary();
-  if (!lib) { lib = newLibrary(); firstRun = true; await saveLibrary(lib); }
-  state.lib = lib;
-  state.color = lib.settings.color || '#1e293b';
-  state.colors.pen = lib.settings.color || '#1e293b';
-  state.colors.highlighter = lib.settings.hlColor || '#fde047';
-  state.colors.ballpen = lib.settings.ballpenColor || '#1e293b';
-  state.tool = lib.settings.tool || 'pen';
-  state.shape = lib.settings.shape || 'line';
-  if (state.colors[state.tool]) state.color = state.colors[state.tool];
-  state.widths.pen = lib.settings.penWidth || 5;
-  state.widths.highlighter = lib.settings.hlWidth || 14;
-  state.widths.ballpen = lib.settings.ballpenWidth || 5;
+  // 1) 后端可用性 + 恢复登录（认证初始化）
+  const health = await api('/api/health');
+  state.authAvailable = !!(health.ok && health.status === 200);
+  const saved = loadAuth();
+  if (state.authAvailable && saved && saved.token) {
+    // 先挂上令牌再校验，api() 才会携带 Authorization
+    state.auth = { token: saved.token, user: saved.user || null };
+    const me = await api('/api/me');
+    if (me.ok && me.user) { state.auth = { token: saved.token, user: me.user }; storeAuth(state.auth); }
+    else {
+      state.auth = null;
+      try { localStorage.removeItem(AUTH_KEY); } catch (_) {}
+    }
+  }
+  // 2) 数据源：登录 -> 服务器库；未登录 -> 本机（读取失败自动从备份恢复，绝不静默覆盖）
+  let lib;
+  if (state.auth) {
+    await loadServerLibrary();
+    lib = state.lib;
+  } else {
+    lib = await loadLibrary();
+    if (!lib) {
+      const bak = loadLocalBackup();
+      if (bak) { lib = bak; toast('检测到本地备份，已自动恢复数据'); }
+    }
+    if (!lib) { lib = newLibrary(); firstRun = true; }
+    state.lib = lib;
+    applySettingsFromLib(lib);
+    saveLibrary(lib);
+  }
 
   bindUI();
   updateToolUI();
@@ -2270,6 +2287,7 @@ async function init() {
   renderSettings();
   applyToolbarLayout();
   applyTheme();
+  updateAuthUI();
 
   const active = lib.active || {};
   let note = active.noteId ? lib.notes[active.noteId] : null;
@@ -2304,6 +2322,9 @@ async function init() {
 }
 
 init();
+
+
+
 
 
 
