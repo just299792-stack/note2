@@ -333,6 +333,7 @@ function bindUI() {
   });
   $('#btnMore').addEventListener('click', (e) => {
     e.stopPropagation();
+    renderSettings();
     $('#moreMenu').classList.toggle('hidden');
   });
   $('#btnNewNote').addEventListener('click', createNote);
@@ -370,14 +371,8 @@ function bindUI() {
     if (act === 'about') aboutModal();
   });
   $('#optFinger').addEventListener('change', (e) => { state.lib.settings.fingerDraw = e.target.checked; saveLibrary(state.lib); });
-  $('#optTwoFinger').addEventListener('change', (e) => { state.lib.settings.twoFingerUndo = e.target.checked; saveLibrary(state.lib); });
-  $('#optAutoPage').addEventListener('change', (e) => { state.lib.settings.autoPage = e.target.checked; saveLibrary(state.lib); });
-  // 设置面板：打开时刷新 + 工具栏布局
-  $('#btnMore').addEventListener('click', (e) => {
-    e.stopPropagation();
-    renderSettings();
-    $('#moreMenu').classList.toggle('hidden');
-  });
+  const o2f = $('#optTwoFinger'); if (o2f) o2f.addEventListener('change', (e) => { state.lib.settings.twoFingerUndo = e.target.checked; saveLibrary(state.lib); });
+  const oap = $('#optAutoPage'); if (oap) oap.addEventListener('change', (e) => { state.lib.settings.autoPage = e.target.checked; saveLibrary(state.lib); });
   window.addEventListener('resize', applyToolbarLayout);
   // 页面导航
   $('#btnPrevPage').addEventListener('click', () => switchPage(state.pageIndex - 1));
@@ -1145,9 +1140,9 @@ async function init() {
   bindUI();
   updateToolUI();
   updateColorUI();
-  $('#optFinger').checked = !!lib.settings.fingerDraw;
-  $('#optTwoFinger').checked = lib.settings.twoFingerUndo !== false;
-  $('#optAutoPage').checked = lib.settings.autoPage !== false;
+  const ofEl = $('#optFinger'); if (ofEl) ofEl.checked = !!lib.settings.fingerDraw;
+  const o2El = $('#optTwoFinger'); if (o2El) o2El.checked = lib.settings.twoFingerUndo !== false;
+  const oaEl = $('#optAutoPage'); if (oaEl) oaEl.checked = lib.settings.autoPage !== false;
   renderSettings();
   applyToolbarLayout();
 
@@ -1183,6 +1178,7 @@ async function init() {
 }
 
 init();
+
 
 
 

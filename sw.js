@@ -1,5 +1,5 @@
 ﻿/* 笔记 · Service Worker —— 离线可用 */
-const CACHE = 'note2-v7';
+const CACHE = 'note2-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -28,14 +28,18 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // 网络优先：联网时始终取最新（更新立即生效）；离线时回退缓存
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      const copy = res.clone();
-      if (res.ok && new URL(e.request.url).origin === location.origin) caches.open(CACHE).then((c) => c.put(e.request, copy));
+    fetch(e.request).then((res) => {
+      if (res.ok && new URL(e.request.url).origin === location.origin) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy));
+      }
       return res;
-    }).catch(() => hit))
+    }).catch(() => caches.match(e.request))
   );
 });
+
 
 
 
