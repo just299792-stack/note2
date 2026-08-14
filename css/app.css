@@ -686,3 +686,24 @@ body.theme-light .topbar {
 .pt-move.right { right: 2px; }
 .pt-move .ic { width: 12px; height: 12px; }
 
+
+/* 康奈尔纸张预览 */
+.paper-style .cornell { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 11px, rgba(147,197,253,.55) 11px 12px); }
+.paper-style .cornell::before { content: ''; position: absolute; left: 30%; top: 0; bottom: 0; border-left: 1.5px solid rgba(147,197,253,.8); }
+.paper-style .cornell::after { content: ''; position: absolute; left: 0; right: 0; top: 72%; border-top: 1.5px solid rgba(147,197,253,.8); }
+
+/* 复制页面到其他笔记 */
+.copy-list { max-height: 45vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+
+/* 笔记本操作按钮 */
+.notebook { display: flex; align-items: center; gap: 6px; }
+.notebook .nb-main { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 4px; border-radius: 8px; font-size: 13px; color: inherit; text-align: left; }
+.notebook .nb-main:hover { background: transparent; }
+.notebook .nb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nb-more {
+  flex: none; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 7px; color: var(--text-3); opacity: .45; transition: opacity .15s, background .15s, color .15s;
+}
+.notebook:hover .nb-more { opacity: 1; }
+.nb-more:hover { background: var(--accent-soft); color: var(--accent); }
+.nb-more .ic { width: 15px; height: 15px; }

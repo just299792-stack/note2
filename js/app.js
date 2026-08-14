@@ -7,13 +7,13 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.9';
+const APP_VERSION = '4.10';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
 const PEN_COLORS = ['#1e293b','#0f172a','#475569','#94a3b8','#ffffff','#dc2626','#ea580c','#d97706','#16a34a','#0891b2','#2563eb','#7c3aed','#db2777'];
 const HL_COLORS = ['#fde047','#fef08a','#fdba74','#fca5a5','#86efac','#5eead4','#7dd3fc','#c4b5fd','#f9a8d4','#fda4af'];
-const PAPER_STYLES = [ { id: 'blank', name: '空白' }, { id: 'line', name: '横线' }, { id: 'grid', name: '方格' }, { id: 'dot', name: '点阵' } ];
+const PAPER_STYLES = [ { id: 'blank', name: '空白' }, { id: 'line', name: '横线' }, { id: 'grid', name: '方格' }, { id: 'dot', name: '点阵' }, { id: 'cornell', name: '康奈尔' } ];
 const PAPER_COLORS = ['white', 'cream', 'grey', 'black', 'blue', 'green'];
 
 const state = {
@@ -415,6 +415,7 @@ function bindUI() {
     if (act === 'import') $('#fileInput').click();
     if (act === 'add-page') addPage();
     if (act === 'duplicate-page') duplicatePage();
+    if (act === 'copy-page-to') copyPageTo();
     if (act === 'delete-page') deletePage();
     if (act === 'account') { if (state.auth) logout(true); else openAuthModal('login'); }
     if (act === 'logout') logout(true);
@@ -561,7 +562,7 @@ function updatePaperUI() {
     const b = document.createElement('button');
     b.className = 'paper-style' + (note.paper.style === st.id ? ' active' : '');
     b.title = st.name;
-    if (st.id !== 'blank') b.innerHTML = `<div class="${st.id === 'line' ? 'lines' : st.id === 'grid' ? 'grid' : 'dots'}"></div>`;
+    if (st.id !== 'blank') { const cls = st.id === 'line' ? 'lines' : st.id === 'grid' ? 'grid' : st.id === 'cornell' ? 'cornell' : 'dots'; b.innerHTML = `<div class="${cls}"></div>`; }
     b.addEventListener('click', () => setPaper(st.id, note.paper.color));
     styles.appendChild(b);
   }
@@ -804,21 +805,29 @@ function renderLibrary() {
       nbs.className = 'notebooks';
       let nbi = 0;
       for (const nb of subj.notebooks) {
-        const b = document.createElement('button');
-        b.className = 'notebook' + (nb.id === state.activeNotebookId ? ' active' : '');
-        b.innerHTML = `<span class="nb-icon"></span><span class="nb-name"></span>`;
+        const wrapNb = document.createElement('div');
+        wrapNb.className = 'notebook' + (nb.id === state.activeNotebookId ? ' active' : '');
+        const main = document.createElement('button');
+        main.className = 'nb-main';
+        main.innerHTML = `<span class="nb-icon"></span><span class="nb-name"></span>`;
         const hue = (nbi++ * 47) % 360;
-        b.querySelector('.nb-icon').style.background = `linear-gradient(135deg, hsl(${hue},78%,60%), hsl(${(hue + 45) % 360},72%,52%))`;
-        b.querySelector('.nb-icon').textContent = nb.name.slice(0, 1);
-        b.querySelector('.nb-name').textContent = nb.name;
-        b.addEventListener('click', (e) => {
+        main.querySelector('.nb-icon').style.background = `linear-gradient(135deg, hsl(${hue},78%,60%), hsl(${(hue + 45) % 360},72%,52%))`;
+        main.querySelector('.nb-icon').textContent = nb.name.slice(0, 1);
+        main.querySelector('.nb-name').textContent = nb.name;
+        main.addEventListener('click', (e) => {
           e.stopPropagation();
           state.activeSubjectId = subj.id;
           state.activeNotebookId = nb.id;
           renderLibrary();
           renderNoteList();
         });
-        nbs.appendChild(b);
+        wrapNb.appendChild(main);
+        const more = document.createElement('button');
+        more.className = 'nb-more';
+        more.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
+        more.addEventListener('click', (e) => { e.stopPropagation(); notebookActions(nb, more); });
+        wrapNb.appendChild(more);
+        nbs.appendChild(wrapNb);
       }
       if (!subj.notebooks.length) {
         const empty = document.createElement('div');
@@ -981,6 +990,99 @@ function createNote() {
   openNote(note.id);
   renderLibrary();
   toast('已新建笔记');
+}
+
+/* ---------------- 笔记本操作 ---------------- */
+function notebookActions(nb, anchor) {
+  document.querySelectorAll('.ni-menu').forEach(m => m.remove());
+  const menu = document.createElement('div');
+  menu.className = 'menu ni-menu';
+  menu.innerHTML = `
+    <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
+  const r = anchor.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 190)) + 'px';
+  menu.style.top = (r.bottom + 4) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNotebook(nb); });
+  menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNotebookConfirm(nb); });
+  setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
+}
+
+function renameNotebook(nb) {
+  promptModal('重命名笔记本', '', '笔记本名称', '保存', (name) => {
+    if (!name) return;
+    nb.name = name;
+    saveLibrary(state.lib);
+    renderLibrary();
+    toast('已重命名');
+  });
+}
+
+function deleteNotebookConfirm(nb) {
+  const count = nb.noteIds.length;
+  confirmModal(`删除笔记本「${nb.name}」？`, count ? `该笔记本下的 ${count} 篇笔记也会被一并删除，无法恢复。` : '该笔记本将被删除。', '删除', true, () => deleteNotebook(nb));
+}
+
+function deleteNotebook(nb) {
+  for (const s of state.lib.subjects) {
+    const idx = s.notebooks.findIndex(x => x.id === nb.id);
+    if (idx >= 0) { s.notebooks.splice(idx, 1); break; }
+  }
+  nb.noteIds.forEach(id => delete state.lib.notes[id]);
+  if (state.activeNotebookId === nb.id) {
+    const first = state.lib.subjects.reduce((acc, s) => acc || s.notebooks[0] || null, null);
+    if (first) {
+      state.activeNotebookId = first.id;
+      const notes = first.noteIds.map(id => state.lib.notes[id]).filter(Boolean);
+      if (notes.length) openNote(notes[0].id);
+      else { state.activeNoteId = null; renderLibrary(); engine.setPage(null); engine.invalidateRaster(); updatePageNav(); updateEmptyState(); }
+    } else {
+      state.activeNotebookId = null;
+      state.activeNoteId = null;
+      renderLibrary();
+      engine.setPage(null);
+      engine.invalidateRaster();
+      updatePageNav();
+      updateEmptyState();
+    }
+  }
+  saveLibrary(state.lib);
+  renderLibrary();
+  toast('已删除笔记本');
+}
+
+/* ---------------- 复制页到其他笔记 ---------------- */
+function copyPageTo() {
+  const src = currentNote();
+  const srcPage = currentPage();
+  if (!src || !srcPage) return;
+  const targets = [];
+  for (const s of state.lib.subjects) for (const nb of s.notebooks) for (const id of nb.noteIds) {
+    const n = state.lib.notes[id];
+    if (n && n.id !== src.id) targets.push(n);
+  }
+  if (!targets.length) { toast('没有其他笔记可复制'); return; }
+  const { body } = modalShell('复制当前页到…', '<div class="copy-list"></div>', [{ label: '取消' }]);
+  const list = body.querySelector('.copy-list');
+  for (const n of targets) {
+    const b = document.createElement('button');
+    b.className = 'menu-item';
+    b.textContent = n.title;
+    b.addEventListener('click', () => {
+      closeModal();
+      const copy = JSON.parse(JSON.stringify(srcPage));
+      copy.id = newId();
+      copy.strokes.forEach(s => s.id = newId());
+      copy.texts.forEach(t => t.id = newId());
+      n.pages.push(copy);
+      n.updatedAt = Date.now();
+      saveLibrary(state.lib);
+      toast('已复制到「' + n.title + '」');
+    });
+    list.appendChild(b);
+  }
 }
 
 /* ---------------- 页面缩略图 ---------------- */
@@ -1624,6 +1726,9 @@ async function init() {
 }
 
 init();
+
+
+
 
 
 

@@ -45,6 +45,16 @@ export function drawPaper(ctx, style, color, w, h) {
     for (let y = GRID; y < h; y += GRID) for (let x = GRID; x < w; x += GRID) {
       ctx.beginPath(); ctx.arc(x, y, 1.4, 0, 7); ctx.fill();
     }
+  } else if (style === 'cornell') {
+    // 康奈尔：左侧提示列 252px，底部小结区 824px
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let y = LINE; y < 824; y += LINE) { ctx.moveTo(252, y); ctx.lineTo(w, y); }
+    for (let y = LINE; y < h; y += LINE) { ctx.moveTo(0, y); ctx.lineTo(252, y); }
+    ctx.stroke();
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(252, 0); ctx.lineTo(252, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 824); ctx.lineTo(w, 824); ctx.stroke();
   }
   return info;
 }
@@ -787,6 +797,8 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
+
 
 
 
