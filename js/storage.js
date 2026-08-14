@@ -33,7 +33,7 @@ export function newLibrary() {
       autoPage: true, twoFingerUndo: true
     },
     subjects: [
-      { id: subjId, name: '我的科目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [note.id] } ] }
+      { id: subjId, name: '我的项目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [note.id] } ] }
     ],
     notes: { [note.id]: note },
     active: { subjectId: subjId, notebookId: nbId, noteId: note.id, pageIndex: 0 }
@@ -161,7 +161,7 @@ export function sanitize(raw) {
   }
   if (!Array.isArray(lib.subjects) || lib.subjects.length === 0) {
     const subjId = newId(); const nbId = newId();
-    lib.subjects = [{ id: subjId, name: '我的科目', notebooks: [{ id: nbId, name: '导入的笔记本', noteIds: [] }] }];
+    lib.subjects = [{ id: subjId, name: '我的项目', notebooks: [{ id: nbId, name: '导入的笔记本', noteIds: [] }] }];
   }
   lib.notes = lib.notes || {};
   // 清理 subjects/notes 引用
@@ -292,5 +292,6 @@ export async function deleteRecTimeline(noteId, recId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 
 

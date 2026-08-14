@@ -397,7 +397,7 @@ body.toolbar-bottom .tool-btn { min-width: 46px; padding: 8px 8px 6px; }
 body.toolbar-bottom .tool-name { display: none; }
 
 /* 窄屏：JS 已回退 top，这里兜底 */
-@media (max-width: 820px) {
+@media (max-width: 560px) {
   body.toolbar-left #toolGroup, body.toolbar-bottom #toolGroup {
     position: static; transform: none; flex-direction: row; padding: 0;
     background: none; border: none; box-shadow: none; backdrop-filter: none;
@@ -579,3 +579,16 @@ body.toolbar-bottom .tool-btn { padding: 7px 10px 5px; }
 .rec-empty { font-size: 12.5px; color: var(--text-3); text-align: center; padding: 14px 0; }
 .rec-tip { margin: 10px 0 0; font-size: 11px; color: var(--text-3); text-align: center; }
 
+
+
+
+/* 笔记项操作菜单 */
+.note-item { cursor: pointer; }
+.ni-more {
+  flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; color: var(--text-3); opacity: .5; transition: opacity .15s, background .15s, color .15s;
+}
+.note-item:hover .ni-more { opacity: 1; }
+.ni-more:hover { background: var(--accent-soft); color: var(--accent); opacity: 1; }
+.ni-menu { min-width: 150px; z-index: 300; }
+.ni-menu .menu-item { gap: 8px; }

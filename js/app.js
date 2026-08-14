@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.5';
+const APP_VERSION = '4.6';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -360,17 +360,17 @@ function bindUI() {
   $('#recToggle').addEventListener('click', toggleRecording);
   $('#btnRec').classList.toggle('hidden', !state.recSupported);
   $('#btnNewNote').addEventListener('click', createNote);
-  $('#btnNewSubject').addEventListener('click', () => promptModal('新建科目', '', '科目名称', '创建', (name) => {
+  $('#btnNewSubject').addEventListener('click', () => promptModal('新建项目', '', '项目名称', '创建', (name) => {
     if (!name) return;
     state.lib.subjects.push({ id: newId(), name, notebooks: [] });
     saveLibrary(state.lib);
     renderLibrary();
-    toast('已创建科目');
+    toast('已创建项目');
   }));
   $('#btnNewNotebook').addEventListener('click', () => promptModal('新建笔记本', '', '笔记本名称', '创建', (name) => {
     if (!name) return;
     const subj = findActiveSubject();
-    if (!subj) { toast('请先创建科目'); return; }
+    if (!subj) { toast('请先创建项目'); return; }
     subj.notebooks.push({ id: newId(), name, noteIds: [] });
     saveLibrary(state.lib);
     renderLibrary();
@@ -555,7 +555,7 @@ function updatePaperUI() {
 /* ---------------- 设置面板与工具栏布局 ---------------- */
 function applyToolbarLayout() {
   const want = state.lib.settings.toolbar || 'left';
-  const eff = (want === 'top' || window.innerWidth <= 820) ? 'top' : want;
+  const eff = (want === 'top' || window.innerWidth < 560) ? 'top' : want;
   document.body.classList.remove('toolbar-top', 'toolbar-left', 'toolbar-bottom');
   document.body.classList.add('toolbar-' + eff);
   // 顶栏带 backdrop-filter，会破坏内部 fixed 定位；左侧/底部布局把工具组移到 body 下
@@ -787,20 +787,81 @@ function renderNoteList() {
     return;
   }
   for (const note of notes) {
-    const b = document.createElement('button');
-    b.className = 'note-item' + (note.id === state.activeNoteId ? ' active' : '');
     const d = new Date(note.updatedAt || note.createdAt);
     const cov = paperInfo(note.paper.color);
-    b.innerHTML = `<span class="ni-cover"></span><span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>`;
-    b.querySelector('.ni-cover').style.background = cov.bg;
-    b.querySelector('.ni-title').textContent = note.title;
-    b.querySelector('.ni-meta').textContent = `${note.pages.length} 页 · ${d.getMonth() + 1}/${d.getDate()}`;
-    b.addEventListener('click', () => {
+    const item = document.createElement('div');
+    item.className = 'note-item' + (note.id === state.activeNoteId ? ' active' : '');
+    item.innerHTML = `
+      <span class="ni-cover"></span>
+      <span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>
+      <button class="ni-more" aria-label="更多"><svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>`;
+    item.querySelector('.ni-cover').style.background = cov.bg;
+    item.querySelector('.ni-title').textContent = note.title;
+    item.querySelector('.ni-meta').textContent = `${note.pages.length} 页 · ${d.getMonth() + 1}/${d.getDate()}`;
+    item.querySelector('.ni-text').addEventListener('click', () => {
       openNote(note.id);
       if (window.innerWidth <= 820) $('#library').classList.add('hidden-mobile');
     });
-    root.appendChild(b);
+    item.querySelector('.ni-more').addEventListener('click', (e) => {
+      e.stopPropagation();
+      noteActions(note, item.querySelector('.ni-more'));
+    });
+    root.appendChild(item);
   }
+}
+
+function noteActions(note, anchor) {
+  document.querySelectorAll('.ni-menu').forEach(m => m.remove());
+  const menu = document.createElement('div');
+  menu.className = 'menu ni-menu';
+  menu.innerHTML = `
+    <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
+  const r = anchor.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 190)) + 'px';
+  menu.style.top = (r.bottom + 4) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNote(note); });
+  menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNoteConfirm(note); });
+  setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
+}
+
+function renameNote(note) {
+  promptModal('重命名笔记', '', '笔记名称', '保存', (name) => {
+    if (!name) return;
+    note.title = name;
+    if (note.id === state.activeNoteId) $('#titleNote').textContent = name;
+    saveSoon(true);
+    renderNoteList();
+    toast('已重命名');
+  });
+}
+
+function deleteNoteConfirm(note) {
+  confirmModal(`删除笔记「${note.title}」？`, '删除后该笔记的所有页面与内容将无法恢复。', '删除', true, () => deleteNote(note.id));
+}
+
+function deleteNote(noteId) {
+  const nb = findNotebook(state.lib, state.activeNotebookId);
+  if (nb) nb.notebook.noteIds = nb.notebook.noteIds.filter(id => id !== noteId);
+  delete state.lib.notes[noteId];
+  if (state.activeNoteId === noteId) {
+    const remaining = nb ? nb.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
+    if (remaining.length) {
+      openNote(remaining[0].id);
+    } else {
+      state.activeNoteId = null;
+      $('#titleNote').textContent = '未命名笔记';
+      renderLibrary();
+      engine.setPage(null);
+      engine.invalidateRaster();
+      updatePageNav();
+    }
+  }
+  saveLibrary(state.lib);
+  renderLibrary();
+  toast('已删除笔记');
 }
 
 function createNote() {
@@ -809,7 +870,7 @@ function createNote() {
   let nb = findNotebook(state.lib, note.notebookId);
   if (!nb) {
     const subj = findActiveSubject() || state.lib.subjects[0];
-    if (!subj) { toast('请先创建科目'); return; }
+    if (!subj) { toast('请先创建项目'); return; }
     const nbObj = { id: newId(), name: '我的笔记本', noteIds: [] };
     subj.notebooks.push(nbObj);
     note.notebookId = nbObj.id;
@@ -1028,7 +1089,7 @@ function aboutModal() {
       · Apple Pencil 压力感应书写<br>
       · 荧光笔、橡皮擦、套索、文字、形状<br>
       · 双指缩放平移 · 放大镜<br>
-      · 笔记本 / 科目组织，页面管理<br>
+      · 笔记本 / 项目组织，页面管理<br>
       · 导出 .note / PDF，通过分享或文件转移<br>
       · 离线可用，数据保存在本机<br>
       <br>
@@ -1430,6 +1491,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
