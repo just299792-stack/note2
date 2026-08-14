@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.20';
+const APP_VERSION = '4.21';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -57,7 +57,27 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
   getSettings: settings,
   getFont: () => FONT,
-  onStrokeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '书写'); maybeAutoAdvance(st); },
+  onStrokeDone: (st, holdMs) => {
+    recCapture('stroke', st);
+    const hold = holdMs || 0;
+    if (hold >= 450 && (st.tool === 'pen' || st.tool === 'ballpen')) {
+      const det = detectShape(st.points);
+      if (det) {
+        const shapeStroke = { id: st.id, tool: 'pen', shape: det.kind, color: st.color, width: st.width, points: det.points };
+        mutate(() => {
+          const page = currentPage();
+          page.strokes = page.strokes.filter(s => s.id !== st.id);
+          page.strokes.push(shapeStroke);
+        }, '形状识别');
+        const names = { line: '直线', curve: '曲线', polygon: '多边形', ellipse: '椭圆' };
+        toast('已识别为' + (names[det.kind] || det.kind));
+        maybeAutoAdvance(shapeStroke);
+        return;
+      }
+    }
+    mutate(() => currentPage().strokes.push(st), '书写');
+    maybeAutoAdvance(st);
+  },
   onShapeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '形状'); },
   onEraseDone: (ids) => { recCapture('erase', { ids }); mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除'); },
   onPixelEraseDone: (path, radius) => {
@@ -95,6 +115,85 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   }
 });
 let moveBefore = null;
+
+/* ---------------- 形状识别 ---------------- */
+function detectShape(points) {
+  if (!points || points.length < 5) return null;
+  const n = points.length;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of points) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y; }
+  const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+  const diag = Math.hypot(bw, bh);
+  const start = points[0], end = points[n - 1];
+  const closed = Math.hypot(end.x - start.x, end.y - start.y) < diag * 0.18;
+  const lineFit = fitLine(points);
+  if (!closed && lineFit.maxDev < diag * 0.06) {
+    return { kind: 'line', points: [{ x: start.x, y: start.y }, { x: end.x, y: end.y }] };
+  }
+  if (closed) {
+    const corners = rdp(points, diag * 0.06);
+    if (corners.length >= 3 && corners.length <= 8 && polyFitOk(points, corners, diag)) {
+      return { kind: 'polygon', points: corners };
+    }
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    let sumR = 0;
+    for (const p of points) sumR += Math.hypot(p.x - cx, p.y - cy);
+    const avgR = sumR / points.length;
+    let maxDev = 0;
+    for (const p of points) maxDev = Math.max(maxDev, Math.abs(Math.hypot(p.x - cx, p.y - cy) - avgR));
+    if (maxDev < diag * 0.11) {
+      return { kind: 'ellipse', points: [{ x: minX, y: minY }, { x: maxX, y: maxY }] };
+    }
+  }
+  if (!closed && lineFit.maxDev < diag * 0.35) {
+    return { kind: 'curve', points: points.map(p => ({ x: p.x, y: p.y })) };
+  }
+  return null;
+}
+function fitLine(points) {
+  const n = points.length;
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (const p of points) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; }
+  const denom = n * sxx - sx * sx;
+  let a, b;
+  if (Math.abs(denom) > 1e-6) { a = (n * sxy - sx * sy) / denom; b = (sy - a * sx) / n; }
+  else { a = Infinity; b = sx / n; }
+  let maxDev = 0;
+  for (const p of points) {
+    const d = a === Infinity ? Math.abs(p.x - b) : Math.abs(a * p.x - p.y + b) / Math.sqrt(a * a + 1);
+    if (d > maxDev) maxDev = d;
+  }
+  return { maxDev };
+}
+function rdp(pts, eps) {
+  const n = pts.length;
+  if (n <= 2) return pts.slice();
+  let maxD = 0, idx = 0;
+  const a = pts[0], b = pts[n - 1];
+  for (let i = 1; i < n - 1; i++) {
+    const d = distToSeg(pts[i].x, pts[i].y, a.x, a.y, b.x, b.y);
+    if (d > maxD) { maxD = d; idx = i; }
+  }
+  if (maxD > eps) {
+    const left = rdp(pts.slice(0, idx + 1), eps);
+    const right = rdp(pts.slice(idx), eps);
+    return left.slice(0, -1).concat(right);
+  }
+  return [pts[0], pts[n - 1]];
+}
+function polyFitOk(points, polyPts, diag) {
+  const m = polyPts.length;
+  let maxD = 0;
+  for (const p of points) {
+    let best = Infinity;
+    for (let i = 0; i < m; i++) {
+      const a = polyPts[i], b = polyPts[(i + 1) % m];
+      best = Math.min(best, distToSeg(p.x, p.y, a.x, a.y, b.x, b.y));
+    }
+    if (best > maxD) maxD = best;
+  }
+  return maxD < diag * 0.08;
+}
 
 /* ---------------- 像素橡皮擦 ---------------- */
 function distToSeg(px, py, x1, y1, x2, y2) {
@@ -2072,7 +2171,7 @@ function resetSettings() {
     state.lib.settings = {
       fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
-      toolbar: 'left', eraserSize: 24, eraserMode: 'stroke',
+      toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
       autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', theme: 'auto', textSize: 26
     };
@@ -2159,6 +2258,7 @@ async function init() {
 }
 
 init();
+
 
 
 

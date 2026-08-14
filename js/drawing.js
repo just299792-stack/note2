@@ -185,6 +185,24 @@ export function drawShape(ctx, st) {
   } else if (st.shape === 'ellipse') {
     ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, 7);
     ctx.stroke();
+  } else if (st.shape === 'polygon') {
+    const pts = st.points;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (st.shape === 'curve') {
+    const pts = st.points;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i].x + pts[i + 1].x) / 2;
+      const my = (pts[i].y + pts[i + 1].y) / 2;
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    ctx.stroke();
   }
 }
 
@@ -221,6 +239,7 @@ export class DrawingEngine {
     this.lassoPath = null;
     this.eraseIds = new Set();
     this.erasePath = null;
+    this.lastMoveTs = 0;
     this.selection = null;
     this.playbackLock = false;
     this._raf = 0;
@@ -332,11 +351,12 @@ export class DrawingEngine {
         };
         break;
       case 'eraser':
+      case 'pixelEraser':
         this.eraseIds = new Set();
         this.erasePath = [];
         this.lastErase = { x: w.x, y: w.y };
         this.erasePath.push({ x: w.x, y: w.y });
-        if (settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
+        if (settings.tool === 'eraser' && settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
         break;
       case 'lasso':
         if (this.selection && this.selection.ids.length && this.pointInBox(w, this.selection.box)) {
@@ -385,14 +405,15 @@ export class DrawingEngine {
       const np = this.snapPoint(w, pen.tool, filtP);
       if (Math.hypot(np.x - last.x, np.y - last.y) >= MIN_DIST) {
         pen.points.push(np);
+        this.lastMoveTs = Date.now();
         this.dirtyView = true;
       }
-    } else if (settings.tool === 'eraser') {
+    } else if (settings.tool === 'eraser' || settings.tool === 'pixelEraser') {
       if (this.erasePath && Math.hypot(w.x - this.lastErase.x, w.y - this.lastErase.y) >= 6) {
         this.erasePath.push({ x: w.x, y: w.y });
       }
       this.lastErase = { x: w.x, y: w.y };
-      if (settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
+      if (settings.tool === 'eraser' && settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
       this.dirtyView = true;
     } else if (settings.tool === 'lasso') {
       if (this.lassoPath) {
@@ -436,10 +457,11 @@ export class DrawingEngine {
     if (this.currentStroke) {
       const st = this.currentStroke;
       this.currentStroke = null;
-      if (st.points.length >= 2) this.cb.onStrokeDone(st);
+      if (st.points.length >= 2) this.cb.onStrokeDone(st, Date.now() - this.lastMoveTs);
       else this.dirtyView = true;
-    } else if (settings.tool === 'eraser') {
-      if (settings.eraserMode === 'pixel') {
+    } else if (settings.tool === 'eraser' || settings.tool === 'pixelEraser') {
+      const pixelMode = settings.tool === 'pixelEraser' || settings.eraserMode === 'pixel';
+      if (pixelMode) {
         const path = this.erasePath || [];
         this.erasePath = null;
         this.cb.onPixelEraseDone(path, settings.eraserSize || 24);
@@ -807,6 +829,8 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
+
 
 
 

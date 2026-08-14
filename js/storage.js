@@ -3,7 +3,7 @@
    ========================================================= */
 import { PAGE_W, PAGE_H } from './drawing.js';
 
-export const LIB_VERSION = 3;
+export const LIB_VERSION = 4;
 
 let _idc = 0;
 export function newId() {
@@ -28,7 +28,7 @@ export function newLibrary() {
     settings: {
       fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
-      toolbar: 'left', eraserSize: 24, eraserMode: 'stroke',
+      toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
       autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', textSize: 26,
       theme: 'auto'
@@ -147,7 +147,7 @@ export function sanitize(raw) {
   lib.settings = Object.assign({
     fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
     penWidth: 5, hlWidth: 14, hlColor: '#fde047',
-    toolbar: 'left', eraserSize: 24, eraserMode: 'stroke',
+    toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
     defaultPaper: { style: 'line', color: 'white' },
     autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', textSize: 26,
     theme: 'auto'
@@ -155,7 +155,7 @@ export function sanitize(raw) {
   if (!lib.settings.theme) lib.settings.theme = 'auto';
   if (!lib.settings.noteSort) lib.settings.noteSort = 'updated';
   if (!lib.settings.textSize) lib.settings.textSize = 26;
-  // 迁移：旧 twoFingerUndo 开关 -> twoFingerAction
+  // v3 -> v4：工具栏默认改为顶部（尊重用户最新偏好）\n  if (raw.version < 4 && lib.settings.toolbar === 'left') lib.settings.toolbar = 'top';\n  // 迁移：旧 twoFingerUndo 开关 -> twoFingerAction
   if (!lib.settings.twoFingerAction) {
     lib.settings.twoFingerAction = lib.settings.twoFingerUndo === false ? 'off' : 'undo';
   }
@@ -303,6 +303,8 @@ export async function deleteRecTimeline(noteId, recId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
+
 
 
 
