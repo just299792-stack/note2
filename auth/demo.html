@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手记账号系统 · 接入演示</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; padding: 48px 24px; background: #f3f4f6; color: #1f2937; }
+  .card { max-width: 560px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  h2 { margin-top: 0; }
+  .status { padding: 12px 14px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; margin: 12px 0; font-size: 14px; }
+  button { padding: 10px 18px; border: 0; border-radius: 10px; background: #2563eb; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>手记账号系统 · 接入演示</h2>
+  <p>右上角的「登录」按钮由 <code>auth/auth-client.js</code> 自动生成，无需写任何界面代码。</p>
+  <div class="status" id="status">检测中…</div>
+  <div class="status" id="data">—</div>
+  <button id="save">保存一条演示数据（需登录）</button>
+  <p style="font-size:13px;color:#6b7280">保存的数据会写入<strong>当前登录账号</strong>的独立空间；换账号登录看不到彼此的数据。</p>
+</div>
+
+<script src="auth-client.js"></script>
+<script>
+  // ---- 接入点 1：初始化组件（会自动校验/恢复会话） ----
+  Note2Auth.init({ apiBase: '' });
+
+  const status = document.getElementById('status');
+  const data = document.getElementById('data');
+
+  async function refresh() {
+    if (!Note2Auth.isAvailable()) { status.textContent = '后端不可用（纯静态托管，登录已隐藏）'; return; }
+    const user = Note2Auth.getUser();
+    if (!user) { status.textContent = '未登录 —— 数据仅保存在本机'; data.textContent = '—'; return; }
+    status.textContent = '已登录：' + user.username;
+    const r = await fetch('/api/library').then(r => r.json()).catch(() => ({ library: null }));
+    const notes = (r.library && r.library.notes) ? Object.values(r.library.notes) : [];
+    data.textContent = notes.length ? '你的服务器库里有 ' + notes.length + ' 条笔记：' + notes.map(n => n.title).join('、') : '服务器库还是空的，点下方按钮存一条试试';
+  }
+
+  // ---- 接入点 2：监听登录态变化 ----
+  Note2Auth.onAuthChange(refresh);
+  setTimeout(refresh, 500);
+
+  // ---- 接入点 3：保存业务数据到当前账号 ----
+  document.getElementById('save').addEventListener('click', async () => {
+    if (!Note2Auth.getUser()) { status.textContent = '请先点击右上角「登录」注册一个账号'; return; }
+    const r = await fetch('/api/library').then(r => r.json()).catch(() => ({ library: null }));
+    const lib = r.library || { version: 1, settings: {}, subjects: [], notes: {}, active: null };
+    if (!lib.notes) lib.notes = {};
+    if (!lib.subjects) lib.subjects = [];
+    const id = 'demo_' + Date.now();
+    lib.notes[id] = { id, notebookId: 'nb1', title: '演示数据 ' + new Date().toLocaleTimeString(), createdAt: Date.now(), updatedAt: Date.now(), paper: { style: 'line', color: 'white' }, pages: [{ id: 'p1', strokes: [], texts: [] }] };
+    let subj = lib.subjects.find(s => s.id === 's1');
+    if (!subj) { subj = { id: 's1', name: '演示', notebooks: [{ id: 'nb1', name: '演示笔记本', noteIds: [] }] }; lib.subjects.push(subj); }
+    if (!subj.notebooks[0].noteIds.includes(id)) subj.notebooks[0].noteIds.push(id);
+    await fetch('/api/library', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + Note2Auth.getToken() },
+      body: JSON.stringify(lib)
+    });
+    data.textContent = '已保存到账号：' + Note2Auth.getUser().username;
+    refresh();
+  });
+</script>
+</body>
+</html>
+
+
+
