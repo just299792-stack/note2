@@ -14,7 +14,7 @@ const PAPER_INFO = {
   white:  { bg: '#fffefb',  line: 'rgba(120,160,220,.35)',  grid: 'rgba(120,160,220,.30)',  dot: 'rgba(120,160,220,.45)',  dark: false, name: '白色' },
   cream:  { bg: '#fffcf2',  line: 'rgba(190,160,120,.38)',  grid: 'rgba(190,160,120,.32)',  dot: 'rgba(190,160,120,.45)',  dark: false, name: '米黄' },
   grey:   { bg: '#f3f5f7',  line: 'rgba(110,130,160,.35)',  grid: 'rgba(110,130,160,.30)',  dot: 'rgba(110,130,160,.45)',  dark: false, name: '浅灰' },
-  black:  { bg: '#111827',  line: 'rgba(255,255,255,.14)',  grid: 'rgba(255,255,255,.12)',  dot: 'rgba(255,255,255,.22)',  dark: true,  name: '黑' },
+  black:  { bg: '#000000',  line: 'rgba(255,255,255,.14)',  grid: 'rgba(255,255,255,.12)',  dot: 'rgba(255,255,255,.22)',  dark: true,  name: '黑' },
   blue:   { bg: '#eef4ff',  line: 'rgba(90,120,200,.32)',   grid: 'rgba(90,120,200,.28)',   dot: 'rgba(90,120,200,.40)',   dark: false, name: '淡蓝' },
   green:  { bg: '#f0fbf3',  line: 'rgba(80,160,110,.32)',   grid: 'rgba(80,160,110,.28)',   dot: 'rgba(80,160,110,.40)',   dark: false, name: '淡绿' }
 };
@@ -99,6 +99,25 @@ export function drawStroke(ctx, st, info, font) {
       ctx.lineTo((q.x + p.x) / 2, (q.y + p.y) / 2);
       if (i === pts.length - 1) ctx.lineTo(p.x, p.y);
     }
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (st.tool === 'ballpen') {
+    // 圆珠笔：均匀圆润描边（无笔锋，圆头圆角）
+    const pts = st.points;
+    ctx.strokeStyle = st.color;
+    ctx.lineWidth = Math.max(1.4, st.width);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i].x + pts[i + 1].x) / 2;
+      const my = (pts[i].y + pts[i + 1].y) / 2;
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
     ctx.stroke();
     ctx.restore();
     return;
@@ -293,6 +312,7 @@ export class DrawingEngine {
     const w = this.screenToWorld(L.x, L.y);
     switch (settings.tool) {
       case 'pen':
+      case 'ballpen':
       case 'highlighter':
         this.currentStroke = {
           id: 's' + Math.random().toString(36).slice(2, 10),
@@ -767,6 +787,9 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
+
+
 
 
 

@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.3';
+const APP_VERSION = '4.4';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -19,8 +19,8 @@ const PAPER_COLORS = ['white', 'cream', 'grey', 'black', 'blue', 'green'];
 const state = {
   lib: null,
   tool: 'pen', color: '#1e293b', shape: 'line',
-  colors: { pen: '#1e293b', highlighter: '#fde047' },
-  widths: { pen: 5, highlighter: 14, eraser: 24 },
+  colors: { pen: '#1e293b', highlighter: '#fde047', ballpen: '#1e293b' },
+  widths: { pen: 5, highlighter: 14, eraser: 24, ballpen: 5 },
   pageIndex: 0,
   activeNoteId: null, activeNotebookId: null, activeSubjectId: null,
   collapsedSubjects: new Set(),
@@ -316,8 +316,13 @@ function bindUI() {
     updateColorUI();
   });
   $('#widthSlider').addEventListener('input', (e) => {
-    state.widths[state.tool] = parseFloat(e.target.value);
-    $('#widthValue').textContent = Math.round(parseFloat(e.target.value));
+    const v = parseFloat(e.target.value);
+    state.widths[state.tool] = v;
+    if (state.tool === 'pen') state.lib.settings.penWidth = v;
+    else if (state.tool === 'highlighter') state.lib.settings.hlWidth = v;
+    else if (state.tool === 'ballpen') state.lib.settings.ballpenWidth = v;
+    $('#widthValue').textContent = Math.round(v);
+    saveLibrary(state.lib);
   });
   document.querySelectorAll('.shape-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -492,8 +497,9 @@ function updateColorUI() {
     sw.addEventListener('click', () => {
       state.colors[state.tool] = c;
       state.color = c;
-      state.lib.settings.color = c;
       if (state.tool === 'highlighter') state.lib.settings.hlColor = c;
+      else if (state.tool === 'ballpen') state.lib.settings.ballpenColor = c;
+      else state.lib.settings.color = c;
       saveLibrary(state.lib);
       updateColorUI();
     });
@@ -601,6 +607,24 @@ function renderSettings() {
         renderSettings();
       });
       hlBox.appendChild(sw);
+    });
+  }
+  // 圆珠笔默认色
+  const bpBox = $('#ballpenColors');
+  if (bpBox) {
+    bpBox.innerHTML = '';
+    PEN_COLORS.forEach(c => {
+      const sw = document.createElement('button');
+      sw.className = 'swatch' + (state.colors.ballpen === c ? ' active' : '');
+      sw.style.background = c;
+      sw.addEventListener('click', () => {
+        state.colors.ballpen = c;
+        if (state.tool === 'ballpen') { state.color = c; st.ballpenColor = c; updateColorUI(); }
+        st.ballpenColor = c;
+        saveLibrary(state.lib);
+        renderSettings();
+      });
+      bpBox.appendChild(sw);
     });
   }
   // 橡皮擦大小
@@ -1120,11 +1144,13 @@ function applySettingsFromLib(lib) {
   state.color = lib.settings.color || '#1e293b';
   state.colors.pen = lib.settings.color || '#1e293b';
   state.colors.highlighter = lib.settings.hlColor || '#fde047';
+  state.colors.ballpen = lib.settings.ballpenColor || '#1e293b';
   state.tool = lib.settings.tool || 'pen';
   state.shape = lib.settings.shape || 'line';
   if (state.colors[state.tool]) state.color = state.colors[state.tool];
   state.widths.pen = lib.settings.penWidth || 5;
   state.widths.highlighter = lib.settings.hlWidth || 14;
+  state.widths.ballpen = lib.settings.ballpenWidth || 5;
 }
 
 function bootstrapUI() {
@@ -1354,11 +1380,13 @@ async function init() {
   state.color = lib.settings.color || '#1e293b';
   state.colors.pen = lib.settings.color || '#1e293b';
   state.colors.highlighter = lib.settings.hlColor || '#fde047';
+  state.colors.ballpen = lib.settings.ballpenColor || '#1e293b';
   state.tool = lib.settings.tool || 'pen';
   state.shape = lib.settings.shape || 'line';
   if (state.colors[state.tool]) state.color = state.colors[state.tool];
   state.widths.pen = lib.settings.penWidth || 5;
   state.widths.highlighter = lib.settings.hlWidth || 14;
+  state.widths.ballpen = lib.settings.ballpenWidth || 5;
 
   bindUI();
   updateToolUI();
@@ -1402,6 +1430,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
