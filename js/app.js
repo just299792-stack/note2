@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.13';
+const APP_VERSION = '4.14';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -77,7 +77,17 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     moveBefore = null;
     saveSoon(true);
   },
-  onTextTap: (w) => createTextEdit(w),
+  onTextTap: (w) => {
+    const page = currentPage();
+    if (page) {
+      const hit = page.texts.find(t =>
+        w.x >= t.x * PAGE_W && w.x <= (t.x + t.w) * PAGE_W &&
+        w.y >= t.y * PAGE_H && w.y <= (t.y + t.h) * PAGE_H
+      );
+      if (hit) { editTextItem(hit); return; }
+    }
+    createTextEdit(w);
+  },
   onTwoFingerTap: () => {
     const a = state.lib.settings.twoFingerAction || 'undo';
     if (a === 'undo') undo();
@@ -367,6 +377,53 @@ function createTextEdit(world) {
     item.w = Math.max(0.12, (maxW + pad * 2) / PAGE_W);
     item.h = (lines.length * fontSize * 1.3 + pad * 2) / PAGE_H;
     mutate(() => currentPage().texts.push(item), '文字');
+  };
+  ta.addEventListener('blur', finish);
+  ta.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') { done = true; ta.remove(); }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') ta.blur();
+  });
+}
+
+/* ---------------- 文字再次编辑 ---------------- */
+function editTextItem(item) {
+  const layer = $('#textLayer');
+  const ta = document.createElement('textarea');
+  ta.className = 'text-edit';
+  const sp = engine.worldToScreen(item.x * PAGE_W, item.y * PAGE_H);
+  const scale = engine.scale;
+  ta.style.left = sp.x + 'px';
+  ta.style.top = sp.y + 'px';
+  ta.style.width = Math.max(120, item.w * PAGE_W * scale) + 'px';
+  ta.style.minHeight = Math.round(item.h * PAGE_H * scale) + 'px';
+  ta.style.fontSize = Math.round(item.fontSize * scale) + 'px';
+  ta.style.color = item.color;
+  ta.value = item.text;
+  layer.appendChild(ta);
+  ta.focus();
+  let done = false;
+  const finish = () => {
+    if (done) return; done = true;
+    const text = ta.value.replace(/\n+$/g, '');
+    ta.remove();
+    const page = currentPage();
+    if (!page) return;
+    if (!text) {
+      mutate(() => { page.texts = page.texts.filter(t => t.id !== item.id); }, '删除文字');
+      return;
+    }
+    const mctx = document.createElement('canvas').getContext('2d');
+    mctx.font = `600 ${item.fontSize}px ${FONT}`;
+    const lines = text.split('\n');
+    let maxW = 0;
+    for (const ln of lines) maxW = Math.max(maxW, mctx.measureText(ln).width);
+    const pad = 10;
+    mutate(() => {
+      item.text = text;
+      item.w = Math.max(0.12, (maxW + pad * 2) / PAGE_W);
+      item.h = (lines.length * item.fontSize * 1.3 + pad * 2) / PAGE_H;
+    }, '编辑文字');
   };
   ta.addEventListener('blur', finish);
   ta.addEventListener('keydown', (e) => {
@@ -1996,6 +2053,7 @@ async function init() {
 }
 
 init();
+
 
 
 
