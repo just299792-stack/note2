@@ -864,7 +864,9 @@ function aboutModal() {
       · 双指缩放平移 · 放大镜<br>
       · 笔记本 / 科目组织，页面管理<br>
       · 导出 .note / PDF，通过分享或文件转移<br>
-      · 离线可用，数据保存在本机
+      · 离线可用，数据保存在本机<br>
+      <br>
+      版本 ${APP_VERSION} · 2026-08-14
     </div>`, [
     { label: '好的', primary: true }
   ]);
@@ -1058,6 +1060,7 @@ async function init() {
 }
 
 init();
+
 
 
 
