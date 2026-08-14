@@ -428,3 +428,6 @@ body.toolbar-bottom .tool-name { display: none; }
   background: repeating-linear-gradient(transparent 0 4px, rgba(120,140,180,.28) 4px 5px);
 }
 .ni-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+
+/* 底部工具条布局：翻页条上移避免重叠 */
+body.toolbar-bottom .page-nav { bottom: 92px; }

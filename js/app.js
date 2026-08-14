@@ -534,6 +534,16 @@ function applyToolbarLayout() {
   const eff = (want === 'top' || window.innerWidth <= 820) ? 'top' : want;
   document.body.classList.remove('toolbar-top', 'toolbar-left', 'toolbar-bottom');
   document.body.classList.add('toolbar-' + eff);
+  // 顶栏带 backdrop-filter，会破坏内部 fixed 定位；左侧/底部布局把工具组移到 body 下
+  const tg = document.getElementById('toolGroup');
+  const tbTools = document.querySelector('.tb-tools');
+  const tbActions = document.querySelector('.tb-actions');
+  if (!tg || !tbTools || !tbActions) return;
+  if (eff === 'top') {
+    if (tg.parentElement !== tbTools) tbTools.insertBefore(tg, tbActions);
+  } else {
+    if (tg.parentElement !== document.body) document.body.appendChild(tg);
+  }
 }
 
 function renderSettings() {
@@ -1178,6 +1188,7 @@ async function init() {
 }
 
 init();
+
 
 
 
