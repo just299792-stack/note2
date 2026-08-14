@@ -3,11 +3,12 @@
    ========================================================= */
 import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLocalBackup, sanitize, findNote, findNotebook,
   saveAudioBlob, getAudioBlob, deleteAudioBlob, saveRecMeta, getRecMeta,
-  saveRecTimeline, getRecTimeline, deleteRecTimeline } from './storage.js';
+  saveRecTimeline, getRecTimeline, deleteRecTimeline,
+  saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot } from './storage.js';
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.25';
+const APP_VERSION = '4.26';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -21,6 +22,7 @@ const state = {
   tool: 'pen', color: '#1e293b', shape: 'line',
   colors: { pen: '#1e293b', highlighter: '#fde047', ballpen: '#1e293b' },
   widths: { pen: 5, highlighter: 14, eraser: 24, ballpen: 5 },
+  styles: { pen: 'normal', ballpen: 'normal' },
   pageIndex: 0,
   activeNoteId: null, activeNotebookId: null, activeSubjectId: null,
   collapsedSubjects: new Set(),
@@ -45,6 +47,7 @@ function settings() {
   return {
     tool: state.tool, color: state.color, shape: state.shape,
     width: state.widths[state.tool] || 5,
+    style: state.styles[state.tool] || 'normal',
     fingerDraw: !!state.lib.settings.fingerDraw,
     eraserSize: state.lib.settings.eraserSize || 24,
     eraserMode: state.lib.settings.eraserMode || 'stroke'
@@ -294,10 +297,10 @@ function maybeAutoAdvance(st) {
 }
 
 /* ---------------- 历史记录 ---------------- */
-function pageSnapshot(page) { return JSON.stringify({ s: page.strokes, t: page.texts }); }
+function pageSnapshot(page) { return JSON.stringify({ s: page.strokes, t: page.texts, i: page.images || [] }); }
 function restoreContent(page, json) {
   const d = JSON.parse(json);
-  page.strokes = d.s; page.texts = d.t;
+  page.strokes = d.s; page.texts = d.t; if (d.i) page.images = d.i;
   if (page === currentPage()) { engine.invalidateRaster(); refreshThumbs(); }
   saveSoon();
 }
@@ -350,6 +353,7 @@ function saveSoon(touch) {
     const done = () => { state.saving = false; refreshTitleMeta(); };
     if (state.auth) api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) }).then(done).catch(done);
     else Promise.resolve(saveLibrary(state.lib)).then(done);
+    scheduleSnapshot();
   }, 350);
 }
 async function flushSave() {
@@ -461,7 +465,7 @@ function duplicatePage() {
 
 function clearPage() {
   confirmModal('清空当前页？', '当前页的所有笔迹与文字都会被删除。', '清空', true, () => {
-    mutate(() => { currentPage().strokes = []; currentPage().texts = []; }, '清空页面');
+    mutate(() => { currentPage().strokes = []; currentPage().texts = []; currentPage().images = []; }, '清空页面');
     toast('已清空当前页');
   });
 }
@@ -482,10 +486,58 @@ function deletePage() {
 }
 
 /* ---------------- 文字工具 ---------------- */
+/* ??????? */
+function attachTextStyleBar(ta, item) {
+  const layer = $('#textLayer');
+  const bar = document.createElement('div');
+  bar.className = 'text-style-bar';
+  const render = () => {
+    bar.innerHTML = '';
+    bar.style.left = ta.style.left;
+    bar.style.top = (parseFloat(ta.style.top) - 40) + 'px';
+    const sync = () => {
+      ta.style.fontSize = Math.round(item.fontSize * engine.scale) + 'px';
+      ta.style.fontWeight = item.bold ? '700' : '400';
+      ta.style.fontStyle = item.italic ? 'italic' : 'normal';
+      ta.style.textDecoration = item.underline ? 'underline' : 'none';
+      ta.style.color = item.color;
+    };
+    sync();
+    const mk = (label, cls, fn) => {
+      const b = document.createElement('button');
+      b.className = 'ts-btn ' + cls;
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      bar.appendChild(b);
+      return b;
+    };
+    ensureTextPresets();
+    (state.lib.settings.textPresets || []).forEach(pr => {
+      mk(pr.name, 'ts-preset', () => {
+        item.fontSize = pr.fontSize; item.bold = !!pr.bold; item.italic = !!pr.italic; item.underline = !!pr.underline;
+        render();
+      });
+    });
+    mk('B', item.bold ? 'active' : '', () => { item.bold = !item.bold; render(); });
+    mk('I', item.italic ? 'active' : '', () => { item.italic = !item.italic; render(); });
+    mk('U', item.underline ? 'active' : '', () => { item.underline = !item.underline; render(); });
+    [18, 26, 34].forEach(v => mk(v + 'px', 'ts-size ' + (item.fontSize === v ? 'active' : ''), () => { item.fontSize = v; render(); }));
+    ['#1e293b', '#dc2626', '#2563eb', '#16a34a', '#db2777'].forEach(c => {
+      const b = mk('', 'ts-color ' + (item.color === c ? 'active' : ''), () => { item.color = c; render(); });
+      b.style.background = c;
+    });
+    [['left', '左'], ['center', '中'], ['right', '右']].forEach(([v, l]) => mk(l, 'ts-align ' + (item.align === v ? 'active' : ''), () => { item.align = v; render(); }));
+  };
+  render();
+  layer.appendChild(bar);
+  return bar;
+}
+
 function createTextEdit(world) {
   const fontSize = state.lib.settings.textSize || 26;
   const color = state.color;
-  const item = { id: newId(), x: world.x / PAGE_W, y: world.y / PAGE_H, w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left' };
+  const pres = (state.lib.settings.textPresets && state.lib.settings.textPresets[1]) || {};
+  const item = { id: newId(), x: world.x / PAGE_W, y: world.y / PAGE_H, w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline };
   const layer = $('#textLayer');
   const ta = document.createElement('textarea');
   ta.className = 'text-edit';
@@ -500,12 +552,14 @@ function createTextEdit(world) {
   ta.style.lineHeight = '1.3';
   ta.placeholder = '输入文字…';
   layer.appendChild(ta);
+  const styleBar = attachTextStyleBar(ta, item);
   ta.focus();
   let done = false;
   const finish = () => {
     if (done) return; done = true;
     const text = ta.value.replace(/\n+$/g, '');
     ta.remove();
+    if (styleBar) styleBar.remove();
     if (!text) return;
     const mctx = document.createElement('canvas').getContext('2d');
     mctx.font = `600 ${fontSize}px ${FONT}`;
@@ -521,7 +575,7 @@ function createTextEdit(world) {
   ta.addEventListener('blur', finish);
   ta.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Escape') { done = true; ta.remove(); }
+    if (e.key === 'Escape') { done = true; ta.remove(); if (styleBar) styleBar.remove(); }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') ta.blur();
   });
 }
@@ -541,12 +595,14 @@ function editTextItem(item) {
   ta.style.color = item.color;
   ta.value = item.text;
   layer.appendChild(ta);
+  const styleBar = attachTextStyleBar(ta, item);
   ta.focus();
   let done = false;
   const finish = () => {
     if (done) return; done = true;
     const text = ta.value.replace(/\n+$/g, '');
     ta.remove();
+    if (styleBar) styleBar.remove();
     const page = currentPage();
     if (!page) return;
     if (!text) {
@@ -568,7 +624,7 @@ function editTextItem(item) {
   ta.addEventListener('blur', finish);
   ta.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Escape') { done = true; ta.remove(); }
+    if (e.key === 'Escape') { done = true; ta.remove(); if (styleBar) styleBar.remove(); }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') ta.blur();
   });
 }
@@ -675,6 +731,12 @@ function bindUI() {
     if (act === 'export-page-png') exportPagePng();
     if (act === 'export-library') exportLibrary();
     if (act === 'import') $('#fileInput').click();
+    if (act === 'import-pdf') $('#pdfInput').click();
+    if (act === 'insert-image') $('#imageInput').click();
+    if (act === 'insert-camera') $('#cameraInput').click();
+    if (act === 'present') presentMode();
+    if (act === 'snapshots') openSnapshots();
+    if (act === 'text-presets') openTextPresets();
     if (act === 'add-page') addPage();
     if (act === 'duplicate-page') duplicatePage();
     if (act === 'copy-page-to') copyPageTo();
@@ -731,6 +793,9 @@ function bindUI() {
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
     else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && engine.getSelectionIds().length) { e.preventDefault(); deleteSelection(); }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c' && engine.getSelectionIds().length) { e.preventDefault(); copySelection(); }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteSelection(); }
   });
   // 页面切换快捷键
   document.addEventListener('keydown', (e) => {
@@ -810,6 +875,7 @@ function updateColorUI() {
   const w = state.widths[state.tool] || 5;
   $('#widthSlider').value = w;
   $('#widthValue').textContent = Math.round(w);
+  renderStyleRow();
 }
 
 function updatePageNav() {
@@ -1041,6 +1107,20 @@ function renderSettings() {
       themeEl.appendChild(b);
     });
   }
+  // ????
+  const psRow = $('#penStyleRow');
+  if (psRow) {
+    psRow.innerHTML = '';
+    PEN_STYLES.forEach(v => {
+      const b = document.createElement('button');
+      b.className = (st.penStyle || 'normal') === v ? 'active' : '';
+      b.textContent = STYLE_NAMES[v];
+      b.addEventListener('click', () => { st.penStyle = v; st.ballpenStyle = v; state.styles.pen = v; state.styles.ballpen = v; saveLibrary(state.lib); renderSettings(); });
+      psRow.appendChild(b);
+    });
+  }
+  const oFav = $('#optFavBar'); if (oFav) oFav.checked = st.favoritesBar !== false;
+  const oBak = $('#optAutoBackup'); if (oBak) oBak.checked = st.autoBackup !== false;
 }
 
 function setPaper(style, color) {
@@ -1801,6 +1881,370 @@ function cloneNoteWithNewIds(note) {
   return c;
 }
 
+/* ---------------- v4.26：收藏 / 笔型 / 图片 / PDF / 波形 / 文字样式 / 演示 / 备份 ---------------- */
+const PEN_STYLES = ['normal', 'pencil', 'brush', 'dashed', 'dotted'];
+const STYLE_NAMES = { normal: '钢笔', pencil: '铅笔', brush: '画笔', dashed: '虚线', dotted: '点线' };
+
+/* ---- 收藏工具条 ---- */
+function favoriteKey(f) { return f.tool + ':' + f.color + ':' + (f.width || '') + ':' + (f.style || 'normal') + ':' + (f.eraserSize || ''); }
+function renderFavorites() {
+  const bar = $('#favoritesBar');
+  const list = $('#favList');
+  if (!bar || !list) return;
+  const favs = state.lib.settings.favorites || [];
+  bar.classList.toggle('hidden', !state.lib.settings.favoritesBar || !favs.length);
+  list.innerHTML = '';
+  favs.forEach((f, idx) => {
+    const active = f.tool === state.tool && f.color === state.color && (f.style || 'normal') === (state.styles[f.tool] || 'normal');
+    const b = document.createElement('button');
+    b.className = 'fav-chip' + (active ? ' active' : '');
+    b.title = STYLE_NAMES[f.style || 'normal'] + ' · ' + (f.color || '');
+    b.innerHTML = `<span class="fav-dot" style="background:${f.color}"></span><span class="fav-tool">${f.tool === 'highlighter' ? '荧光' : f.tool === 'ballpen' ? '圆珠' : f.tool === 'eraser' ? '橡皮' : f.tool === 'pixelEraser' ? '像素擦' : '钢笔'}</span>`;
+    b.addEventListener('click', () => {
+      if (state.favEdit) {
+        state.lib.settings.favorites.splice(idx, 1);
+        saveLibrary(state.lib);
+        renderFavorites();
+        toast('已移除收藏');
+        return;
+      }
+      applyFavorite(f);
+    });
+    list.appendChild(b);
+  });
+  const ed = $('#favEdit');
+  if (ed) ed.classList.toggle('active', !!state.favEdit);
+}
+function applyFavorite(f) {
+  state.tool = f.tool;
+  state.color = f.color;
+  if (!state.colors[f.tool]) state.colors[f.tool] = f.color;
+  state.colors[f.tool] = f.color;
+  if (f.width) state.widths[f.tool] = f.width;
+  if (f.style) state.styles[f.tool] = f.style;
+  if (f.eraserSize && (f.tool === 'eraser' || f.tool === 'pixelEraser')) state.lib.settings.eraserSize = f.eraserSize;
+  $('#colorPop').classList.add('hidden');
+  updateToolUI();
+  updateColorUI();
+  saveLibrary(state.lib);
+}
+function addFavorite() {
+  const st = state.lib.settings;
+  const favs = st.favorites || (st.favorites = []);
+  const f = { tool: state.tool, color: state.color, width: state.widths[state.tool] || 5, style: state.styles[state.tool] || 'normal' };
+  if (state.tool === 'eraser' || state.tool === 'pixelEraser') f.eraserSize = st.eraserSize || 26;
+  if (favs.some(x => favoriteKey(x) === favoriteKey(f))) { toast('已在收藏中'); return; }
+  if (favs.length >= 8) { toast('最多收藏 8 个'); return; }
+  favs.push(f);
+  saveLibrary(state.lib);
+  renderFavorites();
+  toast('已收藏当前工具');
+}
+function toggleFavEdit() {
+  state.favEdit = !state.favEdit;
+  document.body.classList.toggle('fav-editing', !!state.favEdit);
+  renderFavorites();
+}
+
+/* ---- 笔型选择 ---- */
+function renderStyleRow() {
+  const row = $('#styleRow');
+  if (!row) return;
+  const isPen = state.tool === 'pen' || state.tool === 'ballpen';
+  row.classList.toggle('hidden', !isPen);
+  if (!isPen) return;
+  row.innerHTML = '';
+  PEN_STYLES.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'style-btn' + ((state.styles[state.tool] || 'normal') === v ? ' active' : '');
+    b.textContent = STYLE_NAMES[v];
+    b.addEventListener('click', () => {
+      state.styles[state.tool] = v;
+      if (state.tool === 'pen') state.lib.settings.penStyle = v;
+      else state.lib.settings.ballpenStyle = v;
+      saveLibrary(state.lib);
+      renderStyleRow();
+      renderFavorites();
+    });
+    row.appendChild(b);
+  });
+}
+
+/* ---- 插入图片 / 拍照 ---- */
+function readFileAsDataURL(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+}
+async function insertImage(file, source) {
+  if (!file || !currentPage()) { toast('请先打开一个笔记'); return; }
+  try {
+    const src = await readFileAsDataURL(file);
+    const page = currentPage();
+    const item = { id: newId(), x: 0.28, y: 0.25, w: 0.44, h: 0.3, src, rot: 0 };
+    mutate(() => { page.images = page.images || []; page.images.push(item); }, '插入图片');
+    engine.invalidateRaster();
+    refreshThumbs();
+    saveSoon(true);
+    toast(source === 'camera' ? '已插入照片' : '已插入图片');
+  } catch (_) { toast('图片读取失败'); }
+}
+
+/* ---- PDF 导入标注 ---- */
+async function importPdf(file) {
+  if (!file) return;
+  if (!window.pdfjsLib) { toast('PDF 组件未加载，请刷新后重试'); return; }
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
+  toast('正在解析 PDF…');
+  try {
+    const buf = await file.arrayBuffer();
+    const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    const maxPages = Math.min(doc.numPages, 60);
+    const pages = [];
+    for (let i = 1; i <= maxPages; i++) {
+      const pdfPage = await doc.getPage(i);
+      const base = pdfPage.getViewport({ scale: 1 });
+      const targetW = Math.min(1400, Math.round(base.width * 1.5));
+      const scale = targetW / base.width;
+      const vp = pdfPage.getViewport({ scale });
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      await pdfPage.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      const src = cv.toDataURL('image/jpeg', 0.82);
+      pages.push({ id: newId(), strokes: [], texts: [], images: [], bg: { kind: 'pdf', src, w: cv.width, h: cv.height } });
+    }
+    const subj = { id: newId(), name: '导入的 PDF · ' + new Date().toLocaleDateString('zh-CN'), notebooks: [] };
+    const nb = { id: newId(), name: file.name.replace(/\.[^.]+$/, ''), noteIds: [] };
+    const note = { id: newId(), notebookId: nb.id, title: file.name.replace(/\.[^.]+$/, ''), createdAt: Date.now(), updatedAt: Date.now(), paper: { style: 'blank', color: 'white' }, pages };
+    state.lib.notes[note.id] = note;
+    nb.noteIds.push(note.id);
+    subj.notebooks.push(nb);
+    state.lib.subjects.push(subj);
+    state.lib = sanitize(state.lib);
+    await saveLibrary(state.lib);
+    openNote(note.id);
+    renderLibrary();
+    toast('已导入 PDF：' + maxPages + ' 页');
+  } catch (err) {
+    console.error(err);
+    toast('PDF 导入失败');
+  }
+}
+
+/* ---- 录音波形 ---- */
+const waveCache = new Map();
+async function buildWave(id, blob) {
+  try {
+    const buf = await blob.arrayBuffer();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const audio = await ctx.decodeAudioData(buf);
+    const data = audio.getChannelData(0);
+    const bars = 64;
+    const peaks = [];
+    const step = Math.max(1, Math.floor(data.length / bars));
+    for (let i = 0; i < bars; i++) {
+      let m = 0;
+      for (let j = i * step; j < Math.min((i + 1) * step, data.length); j++) m = Math.max(m, Math.abs(data[j]));
+      peaks.push(Math.max(0.05, Math.min(1, m * 2.2)));
+    }
+    waveCache.set(id, { peaks, dur: audio.duration });
+    try { ctx.close(); } catch (_) {}
+    return waveCache.get(id);
+  } catch (_) { return null; }
+}
+function drawWave(canvas, peaks, progress) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 120, h = canvas.clientHeight || 28;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  const n = peaks.length;
+  const bw = w / n;
+  for (let i = 0; i < n; i++) {
+    const ph = Math.max(2, peaks[i] * (h - 4));
+    const x = i * bw + bw * 0.15, ww = bw * 0.7;
+    ctx.fillStyle = progress !== null && i / n <= progress ? 'rgba(37,99,235,.9)' : 'rgba(120,130,150,.45)';
+    ctx.beginPath();
+    ctx.rect(x, (h - ph) / 2, ww, ph);
+    ctx.fill();
+  }
+}
+
+/* ---- 文字样式预设 ---- */
+function ensureTextPresets() {
+  const st = state.lib.settings;
+  if (!st.textPresets || !st.textPresets.length) {
+    st.textPresets = [
+      { name: '标题', fontSize: 34, bold: true, italic: false, underline: false },
+      { name: '正文', fontSize: 26, bold: false, italic: false, underline: false },
+      { name: '小字', fontSize: 18, bold: false, italic: false, underline: false }
+    ];
+  }
+}
+function openTextPresets() {
+  ensureTextPresets();
+  const st = state.lib.settings;
+  const body = st.textPresets.map((p, i) => `
+    <div class="pres-row">
+      <input class="pres-name" data-i="${i}" data-k="name" value="${escapeHtml(p.name)}" placeholder="名称">
+      <select data-i="${i}" data-k="fontSize">
+        ${[18, 26, 34].map(v => `<option value="${v}" ${p.fontSize === v ? 'selected' : ''}>${v}px</option>`).join('')}
+      </select>
+      <label class="pres-chk"><input type="checkbox" data-i="${i}" data-k="bold" ${p.bold ? 'checked' : ''}> 加粗</label>
+    </div>`).join('');
+  modalShell('文字样式预设', body, [
+    { label: '取消' },
+    { label: '保存', primary: true, action: (mask) => {
+      mask.querySelectorAll('.pres-row').forEach(row => {
+        const i = Number(row.querySelector('[data-k="name"]').dataset.i);
+        const p = st.textPresets[i];
+        if (!p) return;
+        p.name = row.querySelector('[data-k="name"]').value.trim() || p.name;
+        p.fontSize = Number(row.querySelector('[data-k="fontSize"]').value);
+        p.bold = row.querySelector('[data-k="bold"]').checked;
+      });
+      saveLibrary(state.lib);
+      closeModal();
+      toast('文字预设已保存');
+    }}
+  ]);
+}
+
+/* ---- 演示模式 ---- */
+function presentMode() {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  $('#presMode').classList.remove('hidden');
+  renderPresPage();
+}
+function renderPresPage() {
+  const note = currentNote();
+  if (!note) return;
+  const cv = $('#presCanvas');
+  const ww = window.innerWidth * 0.94, wh = window.innerHeight * 0.9;
+  const ratio = PAGE_W / PAGE_H;
+  let w = ww, h = w / ratio;
+  if (h > wh) { h = wh; w = h * ratio; }
+  cv.style.width = Math.round(w) + 'px';
+  cv.style.height = Math.round(h) + 'px';
+  renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), FONT);
+  $('#presLabel').textContent = (state.pageIndex + 1) + ' / ' + note.pages.length;
+}
+function exitPresent() { $('#presMode').classList.add('hidden'); }
+
+/* ---- 自动备份快照 ---- */
+let snapTimer = null;
+function scheduleSnapshot(immediate) {
+  clearTimeout(snapTimer);
+  snapTimer = setTimeout(async () => {
+    if (state.lib && state.lib.settings.autoBackup === false) return;
+    await saveSnapshot(state.lib);
+  }, immediate ? 2500 : 45000);
+}
+async function openSnapshots() {
+  const list = await listSnapshots();
+  if (!list.length) { toast('还没有备份快照'); return; }
+  const body = list.map(s => `
+    <div class="snap-row">
+      <span class="snap-info">${new Date(s.ts).toLocaleString('zh-CN')} · ${s.library ? Object.keys(s.library.notes).length : 0} 篇笔记</span>
+      <button class="mini-btn" data-restore="${s.id}">恢复</button>
+      <button class="mini-btn danger" data-del="${s.id}">删除</button>
+    </div>`).join('');
+  modalShell('备份快照（最近 10 份）', body, [{ label: '关闭' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', async () => {
+    const lib = await loadSnapshot(b.dataset.restore);
+    if (!lib) { toast('快照不可用'); return; }
+    confirmModal('恢复此快照？', '当前资料库将被快照内容替换（当前内容会先自动备份一份）。', '恢复', true, async () => {
+      await saveSnapshot(state.lib);
+      state.lib = lib;
+      applySettingsFromLib(lib);
+      await saveLibrary(state.lib);
+      renderLibrary();
+      bootstrapUI();
+      toast('已恢复备份快照');
+    });
+  }));
+  mask.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    await deleteSnapshot(b.dataset.del);
+    openSnapshots();
+  }));
+}
+
+/* ---- 选中内容：删除 / 复制 / 粘贴 ---- */
+function deleteSelection() {
+  const ids = engine.getSelectionIds();
+  if (!ids.length || !currentPage()) return;
+  const page = currentPage();
+  const before = pageSnapshot(page);
+  mutate(() => {
+    page.strokes = page.strokes.filter(s => !ids.includes(s.id));
+    page.texts = page.texts.filter(t => !ids.includes('t:' + t.id));
+    if (page.images) page.images = page.images.filter(im => !ids.includes('i:' + im.id));
+  }, '删除选中');
+  engine.clearSelection();
+  engine.invalidateRaster();
+  saveSoon(true);
+}
+let clipboard = null;
+function copySelection() {
+  const ids = engine.getSelectionIds();
+  if (!ids.length || !currentPage()) return;
+  const page = currentPage();
+  clipboard = {
+    strokes: page.strokes.filter(s => ids.includes(s.id)).map(s => JSON.parse(JSON.stringify(s))),
+    texts: page.texts.filter(t => ids.includes('t:' + t.id)).map(t => JSON.parse(JSON.stringify(t))),
+    images: (page.images || []).filter(im => ids.includes('i:' + im.id)).map(im => JSON.parse(JSON.stringify(im)))
+  };
+  toast('已复制选中内容');
+}
+function pasteSelection() {
+  if (!clipboard || !currentPage()) return;
+  const page = currentPage();
+  const dx = 0.02, dy = 0.02;
+  mutate(() => {
+    for (const st of clipboard.strokes) {
+      const c = JSON.parse(JSON.stringify(st)); c.id = newId();
+      for (const pt of c.points) { pt.x += dx * PAGE_W; pt.y += dy * PAGE_H; }
+      page.strokes.push(c);
+    }
+    for (const t of clipboard.texts) { const c = JSON.parse(JSON.stringify(t)); c.id = newId(); c.x += dx; c.y += dy; page.texts.push(c); }
+    for (const im of clipboard.images) { const c = JSON.parse(JSON.stringify(im)); c.id = newId(); c.x += dx; c.y += dy; page.images = page.images || []; page.images.push(c); }
+  }, '粘贴');
+  engine.invalidateRaster();
+  saveSoon(true);
+}
+
+/* ---- v4.26 事件绑定 ---- */
+function bindV426UI() {
+  const favAdd = $('#favAdd'); if (favAdd) favAdd.addEventListener('click', addFavorite);
+  const favEdit = $('#favEdit'); if (favEdit) favEdit.addEventListener('click', toggleFavEdit);
+  const imgIn = $('#imageInput'); if (imgIn) imgIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertImage(f, 'gallery'); });
+  const camIn = $('#cameraInput'); if (camIn) camIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertImage(f, 'camera'); });
+  const pdfIn = $('#pdfInput'); if (pdfIn) pdfIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await importPdf(f); });
+  const oFav = $('#optFavBar'); if (oFav) oFav.addEventListener('change', (e) => { state.lib.settings.favoritesBar = e.target.checked; saveLibrary(state.lib); renderFavorites(); });
+  const oBak = $('#optAutoBackup'); if (oBak) oBak.addEventListener('change', (e) => { state.lib.settings.autoBackup = e.target.checked; saveLibrary(state.lib); if (e.target.checked) scheduleSnapshot(true); });
+  const pPrev = $('#presPrev'); if (pPrev) pPrev.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex - 1); renderPresPage(); } });
+  const pNext = $('#presNext'); if (pNext) pNext.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex + 1); renderPresPage(); } });
+  const pClose = $('#presClose'); if (pClose) pClose.addEventListener('click', exitPresent);
+  const pCv = $('#presCanvas');
+  if (pCv) {
+    pCv.addEventListener('click', (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width;
+      if (currentNote()) { if (x < 0.45) switchPage(state.pageIndex - 1); else switchPage(state.pageIndex + 1); renderPresPage(); }
+    });
+    pCv.addEventListener('dblclick', exitPresent);
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
+  window.addEventListener('pagehide', () => { if (state.lib && state.lib.settings.autoBackup !== false) saveSnapshot(state.lib); });
+}
 /* ---------------- 弹窗 ---------------- */
 function toast(msg) {
   const el = $('#toast');
@@ -2000,6 +2444,8 @@ function applySettingsFromLib(lib) {
   state.widths.pen = lib.settings.penWidth || 5;
   state.widths.highlighter = lib.settings.hlWidth || 14;
   state.widths.ballpen = lib.settings.ballpenWidth || 5;
+  state.styles.pen = lib.settings.penStyle || 'normal';
+  state.styles.ballpen = lib.settings.ballpenStyle || 'normal';
 }
 
 function bootstrapUI() {
@@ -2115,6 +2561,7 @@ function updateRecUI() {
 }
 
 function stopPlayback() {
+  clearInterval(state.rec.waveTimer);
   state.rec.playbackTimers.forEach(clearTimeout);
   state.rec.playbackTimers = [];
   if (state.rec.audioEl) {
@@ -2147,16 +2594,32 @@ async function refreshRecList() {
     row.className = 'rec-item';
     row.innerHTML = `
       <button class="rec-play" data-rec="${escapeHtml(item.id)}"><svg viewBox="0 0 24 24" class="ic"><path d="M8 5v14l11-7z"/></svg></button>
-      <span class="rec-name">${escapeHtml(item.name)}</span>
+      <div class="rec-mid">
+        <span class="rec-name">${escapeHtml(item.name)}</span>
+        <canvas class="rec-wave" data-wave="${escapeHtml(item.id)}" width="120" height="28"></canvas>
+      </div>
       <span class="rec-dur">${fmtTime(item.duration)}</span>
       <button class="rec-del" data-del="${escapeHtml(item.id)}" aria-label="删除"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>`;
-    row.querySelector('.rec-play').addEventListener('click', () => playRecording(item));
+    row.querySelector('.rec-play').addEventListener('click', () => playRecording(item, 0));
     row.querySelector('.rec-del').addEventListener('click', () => deleteRecording(item));
+    const cv = row.querySelector('.rec-wave');
+    cv.addEventListener('click', (e) => {
+      const wd = waveCache.get(item.id);
+      if (!wd) return;
+      const r = cv.getBoundingClientRect();
+      const t = Math.max(0, Math.min(wd.dur, ((e.clientX - r.left) / r.width) * wd.dur));
+      playRecording(item, t);
+    });
     listEl.appendChild(row);
+    (async () => {
+      const blob = await getAudioBlob('audio:' + note.id + ':' + item.id);
+      if (!blob) return;
+      const wd = await buildWave(item.id, blob);
+      if (wd && cv.isConnected) drawWave(cv, wd.peaks, null);
+    })();
   }
 }
-
-async function playRecording(item) {
+async function playRecording(item, startSec) {
   const note = currentNote();
   if (!note) return;
   if (state.rec.active) { toast('请先停止录音'); return; }
@@ -2165,7 +2628,7 @@ async function playRecording(item) {
   stopPlayback();
   const timeline = await getRecTimeline(note.id, item.id);
   const page = currentPage();
-  // 笔迹回放：克隆当前页，去掉时间线里会被重放的笔画，按时间逐笔重现
+  const startMs = (startSec || 0) * 1000;
   if (timeline.length && page) {
     const tlIds = new Set(timeline.filter(e => e.type === 'stroke').map(e => e.data && e.data.id).filter(Boolean));
     const clone = {
@@ -2179,6 +2642,7 @@ async function playRecording(item) {
     engine.invalidateRaster();
     const maxT = Math.max(0, ...timeline.map(e => e.t));
     for (const ev of timeline) {
+      if (ev.t < startMs) continue;
       state.rec.playbackTimers.push(setTimeout(() => {
         if (!state.rec.playback || !engine.page) return;
         const c = engine.page;
@@ -2188,19 +2652,25 @@ async function playRecording(item) {
           c.strokes = c.strokes.filter(s => !ev.data.ids.includes(s.id));
         }
         engine.invalidateRaster();
-      }, ev.t));
+      }, ev.t - startMs));
     }
-    state.rec.playbackTimers.push(setTimeout(() => { if (state.rec.playback) stopPlayback(); }, maxT + 1500));
+    state.rec.playbackTimers.push(setTimeout(() => { if (state.rec.playback) stopPlayback(); }, maxT - startMs + 1500));
   }
   const url = URL.createObjectURL(blob);
   const audio = document.createElement('audio');
   audio.src = url;
+  try { audio.currentTime = startSec || 0; } catch (_) {}
   audio.play().catch(() => {});
   state.rec.audioEl = audio;
   state.rec.playingId = item.id;
-  audio.onended = () => { try { URL.revokeObjectURL(url); } catch (_) {} if (state.rec.playback) stopPlayback(); };
+  state.rec.waveTimer = setInterval(() => {
+    if (!state.rec.audioEl || state.rec.playingId !== item.id) return;
+    const wd = waveCache.get(item.id);
+    const cv = document.querySelector('[data-wave="' + item.id + '"]');
+    if (wd && cv) drawWave(cv, wd.peaks, state.rec.audioEl.currentTime / wd.dur);
+  }, 120);
+  audio.onended = () => { clearInterval(state.rec.waveTimer); try { URL.revokeObjectURL(url); } catch (_) {} if (state.rec.playback) stopPlayback(); };
 }
-
 async function deleteRecording(item) {
   const note = currentNote();
   if (!note) return;
@@ -2221,7 +2691,8 @@ function resetSettings() {
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
-      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', theme: 'auto', textSize: 26
+      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', theme: 'auto', textSize: 26,
+      favorites: [], favoritesBar: true, penStyle: 'normal', ballpenStyle: 'normal', textPresets: [], autoBackup: true
     };
     applySettingsFromLib(state.lib);
     applyToolbarLayout();
@@ -2280,6 +2751,7 @@ async function init() {
   }
 
   bindUI();
+  bindV426UI();
   updateToolUI();
   updateColorUI();
   const ofEl = $('#optFinger'); if (ofEl) ofEl.checked = !!lib.settings.fingerDraw;
@@ -2290,6 +2762,8 @@ async function init() {
   applyToolbarLayout();
   applyTheme();
   updateAuthUI();
+  ensureTextPresets();
+  renderFavorites();
 
   const active = lib.active || {};
   let note = active.noteId ? lib.notes[active.noteId] : null;
@@ -2308,12 +2782,16 @@ async function init() {
   engine.fitView();
   engine.invalidateRaster();
   registerSW();
+  scheduleSnapshot(true);
 
   // 记录首启
   try { if (!localStorage.getItem('note2-seen')) { localStorage.setItem('note2-seen', '1'); } } catch (_) {}
   // 调试句柄（供测试/排查使用）
   window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
-    rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList } };
+    rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
+    renderFavorites, insertImage, importPdf, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
+    buildWave, drawWave, saveAudioBlob, saveRecMeta,
+    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }

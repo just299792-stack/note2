@@ -22,7 +22,10 @@ export function newLibrary() {
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
       autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', textSize: 26,
-      theme: 'auto'
+      theme: 'auto',
+      favorites: [], favoritesBar: true,
+      penStyle: 'normal', ballpenStyle: 'normal',
+      textPresets: [], autoBackup: true
     },
     subjects: [
       { id: subjId, name: '我的项目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [] } ] }
@@ -48,9 +51,10 @@ export function newPage() {
 
 /* ---------- IndexedDB ---------- */
 const DB_NAME = 'note2';
-const DB_VER = 2;
+const DB_VER = 3;
 const STORE = 'library';
 const AUDIO_STORE = 'audio';
+const SNAP_STORE = 'snapshots';
 
 let _dbPromise = null;
 
@@ -62,6 +66,7 @@ function openDB() {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
       if (!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
+      if (!db.objectStoreNames.contains(SNAP_STORE)) db.createObjectStore(SNAP_STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -124,7 +129,10 @@ export function sanitize(raw) {
     toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
     defaultPaper: { style: 'line', color: 'white' },
     autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', textSize: 26,
-    theme: 'auto'
+    theme: 'auto',
+    favorites: [], favoritesBar: true,
+    penStyle: 'normal', ballpenStyle: 'normal',
+    textPresets: [], autoBackup: true
   }, lib.settings || {});
   if (!lib.settings.theme) lib.settings.theme = 'auto';
   if (!lib.settings.noteSort) lib.settings.noteSort = 'updated';
@@ -182,14 +190,23 @@ function sanitizePage(p) {
   p.strokes = (p.strokes || []).map(st => ({
     id: st.id || newId(),
     tool: st.tool === 'highlighter' ? 'highlighter' : 'pen',
+    style: ['normal','pencil','brush','dashed','dotted'].includes(st.style) ? st.style : 'normal',
     color: typeof st.color === 'string' ? st.color : '#1e293b',
     width: Number(st.width) || 4,
     points: (st.points || []).map(pt => ({ x: Number(pt.x), y: Number(pt.y), p: Number(pt.p) || 1 }))
   }));
   p.texts = (p.texts || []).map(t => ({
     id: t.id || newId(), x: Number(t.x)||0, y: Number(t.y)||0, w: Number(t.w)||0.3, h: Number(t.h)||0.06,
-    text: typeof t.text === 'string' ? t.text : '', fontSize: Number(t.fontSize)||24, color: t.color || '#1e293b', align: t.align || 'left'
+    text: typeof t.text === 'string' ? t.text : '', fontSize: Number(t.fontSize)||24, color: t.color || '#1e293b', align: t.align || 'left',
+    bold: !!t.bold, italic: !!t.italic, underline: !!t.underline
   }));
+  p.images = (p.images || []).filter(im => im && typeof im.src === 'string').map(im => ({
+    id: im.id || newId(), x: Number(im.x)||0, y: Number(im.y)||0, w: Number(im.w)||0.3, h: Number(im.h)||0.2,
+    src: im.src, rot: Number(im.rot) || 0
+  }));
+  if (p.bg && typeof p.bg.src === 'string') {
+    p.bg = { kind: p.bg.kind === 'pdf' ? 'pdf' : 'image', src: p.bg.src, w: Number(p.bg.w) || 816, h: Number(p.bg.h) || 1056 };
+  } else delete p.bg;
   return p;
 }
 
@@ -280,14 +297,64 @@ export async function deleteRecTimeline(noteId, recId) {
   });
 }
 
-
-
-
-
-
-
-
-
-
-
+/* ---------- ?????????? ---------- */
+export async function saveSnapshot(lib) {
+  try {
+    const db = await openDB();
+    const snap = { id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), library: JSON.parse(JSON.stringify(lib)) };
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAP_STORE, 'readwrite');
+      tx.objectStore(SNAP_STORE).put(snap, snap.id);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    const all = await listSnapshots();
+    if (all.length > 10) {
+      const rm = all.slice(10);
+      const db2 = await openDB();
+      await new Promise((resolve, reject) => {
+        const tx = db2.transaction(SNAP_STORE, 'readwrite');
+        for (const x of rm) tx.objectStore(SNAP_STORE).delete(x.id);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    return snap;
+  } catch (_) { return null; }
+}
+export async function listSnapshots() {
+  try {
+    const db = await openDB();
+    const all = await new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAP_STORE, 'readonly');
+      const req = tx.objectStore(SNAP_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+    return all.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  } catch (_) { return []; }
+}
+export async function loadSnapshot(id) {
+  try {
+    const db = await openDB();
+    const snap = await new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAP_STORE, 'readonly');
+      const req = tx.objectStore(SNAP_STORE).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+    return snap && snap.library ? sanitize(snap.library) : null;
+  } catch (_) { return null; }
+}
+export async function deleteSnapshot(id) {
+  try {
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAP_STORE, 'readwrite');
+      tx.objectStore(SNAP_STORE).delete(id);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (_) {}
+}
 

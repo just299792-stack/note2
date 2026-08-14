@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -28,7 +28,7 @@
   <header id="topbar" class="topbar">
     <div class="tb-left">
       <button id="btnLibrary" class="icon-btn" title="资料库" aria-label="资料库">
-        <svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <svg viewBox="0 0 24 24" class="ic"><path d="M4.5 6.5h15M4.5 12h11M4.5 17.5h15"/></svg>
       </button>
       <div class="tb-title">
         <div id="titleNote" class="note-title" contenteditable="false" spellcheck="false">未命名笔记</div>
@@ -39,35 +39,35 @@
     <div class="tb-tools">
       <div id="toolGroup" class="tool-group">
         <button class="tool-btn" data-tool="ballpen" title="圆珠笔" aria-label="圆珠笔">
-          <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="6" r="1.7"/><path d="M12 7.5V19M12 19l-2.6-2.6M12 19l2.6-2.6"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="5.4" r="1.5"/><path d="M12 7.4v11.2m0 0l-2.8-2.8m2.8 2.8l2.8-2.8"/></svg>
           <span class="tool-name">圆珠</span>
         </button>
         <button class="tool-btn active" data-tool="pen" title="钢笔" aria-label="钢笔">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M4.2 19.8l1.3-4.1L16.6 4.6a2 2 0 0 1 2.8 2.8L8.3 18.5l-4.1 1.3z"/><path d="M14.8 6.7l2.5 2.5"/></svg>
           <span class="tool-name">钢笔</span>
         </button>
         <button class="tool-btn" data-tool="highlighter" title="荧光笔" aria-label="荧光笔">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M5 19l6-12 6 12M7 15h10" stroke-width="2.4" fill="none"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M5.5 19l5.5-11 5.5 11M8 15h8"/></svg>
           <span class="tool-name">荧光</span>
         </button>
         <button class="tool-btn" data-tool="eraser" title="橡皮擦" aria-label="橡皮擦">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M14.5 4.5l5 5-9 9-5-5zM10 19h9"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M15.4 4.6l4 4-9.4 9.4-4-4zM9.8 19h9.2"/></svg>
           <span class="tool-name">橡皮</span>
         </button>
         <button class="tool-btn" data-tool="pixelEraser" title="像素橡皮" aria-label="像素橡皮">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M4 7h10v6H4zM14 7h6v6h-6zM4 13h6v6H4zM10 13h10v6H10z" fill="none"/><path d="M7 4v3M7 20v-1" stroke-dasharray="2 2"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M4.5 7h9.5v5.5H4.5zM14 7h5.5v5.5H14zM4.5 12.5h6v5.5h-6zM10.5 12.5H19.5V18h-9z"/></svg>
           <span class="tool-name">像素擦</span>
         </button>
         <button class="tool-btn" data-tool="lasso" title="套索" aria-label="套索">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M5 8a7 7 0 0 1 14 0c0 3.3-2.2 6-5 6.6V18" fill="none"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M4.8 8a7.2 7.2 0 0 1 14.4 0c0 3.5-2.3 6.4-5.4 7.1V18"/></svg>
           <span class="tool-name">套索</span>
         </button>
         <button class="tool-btn" data-tool="text" title="文字" aria-label="文字">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M5 7V5h14v2M12 5v14m-3 0h6"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M5 6.8V4.8h14v2M12 4.8v14.4M8.6 19.2h6.8"/></svg>
           <span class="tool-name">文字</span>
         </button>
         <button class="tool-btn" data-tool="shape" title="形状" aria-label="形状">
-          <svg viewBox="0 0 24 24" class="ic"><path d="M4 20L20 4M4 20h12M20 4v12" fill="none"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M4.5 19.5L19.5 4.5M4.5 19.5H17M19.5 4.5V17"/></svg>
           <span class="tool-name">形状</span>
         </button>
       </div>
@@ -77,21 +77,21 @@
           <span class="color-dot" id="colorDot"></span>
         </button>
         <button id="btnUndo" class="icon-btn" title="撤销" aria-label="撤销" disabled>
-          <svg viewBox="0 0 24 24" class="ic"><path d="M9 7L4 12l5 5M4 12h9a6 6 0 0 1 6 6"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M8.5 6.5L4 12l4.5 5.5M4.5 12h8.5a6 6 0 0 1 6 6"/></svg>
         </button>
         <button id="btnRedo" class="icon-btn" title="重做" aria-label="重做" disabled>
-          <svg viewBox="0 0 24 24" class="ic"><path d="M15 7l5 5-5 5M20 12h-9a6 6 0 0 0-6 6"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><path d="M15.5 6.5L20 12l-4.5 5.5M19.5 12H11a6 6 0 0 0-6 6"/></svg>
         </button>
         <span class="tb-divider"></span>
         <button id="btnPages" class="icon-btn" title="页面缩略图" aria-label="页面缩略图">
-          <svg viewBox="0 0 24 24" class="ic"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><rect x="5.5" y="4.5" width="13" height="15" rx="2.2"/><path d="M9.5 9.5h5M9.5 13.5h5M9.5 17h3"/></svg>
         </button>
         <button id="btnRec" class="icon-btn" title="录音" aria-label="录音">
-          <svg viewBox="0 0 24 24" class="ic"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><rect x="9" y="3.5" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18.5V21"/></svg>
         </button>
         <div class="tb-menu-wrap">
           <button id="btnMore" class="icon-btn" title="设置" aria-label="设置">
-            <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+            <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="4.9"/><circle cx="12" cy="12" r="1.6"/><path d="M12 3v1.9M12 19.1V21M3 12h1.9M19.1 12H21M5.2 5.2l1.3 1.3M17.5 17.5l1.3 1.3M18.8 5.2l-1.3 1.3M6.5 17.5l-1.3 1.3"/></svg>
           </button>
           <div id="moreMenu" class="menu settings-menu hidden">
             <div class="menu-sec-title">布局</div>
@@ -104,6 +104,7 @@
             <div class="set-row"><span class="set-label">钢笔</span><div id="penColors" class="mini-swatches"></div></div>
             <div class="set-row"><span class="set-label">荧光笔</span><div id="hlColors" class="mini-swatches"></div></div>
             <div class="set-row"><span class="set-label">圆珠笔</span><div id="ballpenColors" class="mini-swatches"></div></div>
+            <div class="set-row"><span class="set-label">笔型</span><div id="penStyleRow" class="seg"></div></div>
             <div class="set-row"><span class="set-label">橡皮擦</span><div id="eraserSizes" class="seg"></div></div>
             <div class="set-row"><span class="set-label">橡皮模式</span><div id="eraserMode" class="seg"></div></div>
             <div class="set-row"><span class="set-label">文字字号</span><div id="textSizeRow" class="seg"></div></div>
@@ -113,6 +114,10 @@
             <div class="set-row"><span class="set-label">双指轻点</span><div id="twoFingerRow" class="seg"></div></div>
             <label class="menu-item toggle-row"><span>写到页尾自动翻页</span><input type="checkbox" id="optAutoPage"></label>
             <label class="menu-item toggle-row"><span>手指书写</span><input type="checkbox" id="optFinger"></label>
+            <label class="menu-item toggle-row"><span>收藏工具条</span><input type="checkbox" id="optFavBar"></label>
+            <label class="menu-item toggle-row"><span>自动备份</span><input type="checkbox" id="optAutoBackup"></label>
+            <button class="menu-item" data-action="snapshots">备份快照…</button>
+            <button class="menu-item" data-action="text-presets">文字样式预设…</button>
             <div class="menu-sec-title">页面</div>
             <button class="menu-item" data-action="add-page">添加页面</button>
             <button class="menu-item" data-action="duplicate-page">复制当前页</button>
@@ -125,6 +130,10 @@
             <button class="menu-item" data-action="export-page-png">导出当前页为图片</button>
             <button class="menu-item" data-action="export-library">导出整个资料库</button>
             <button class="menu-item" data-action="import">导入笔记文件…</button>
+            <button class="menu-item" data-action="import-pdf">导入 PDF 标注…</button>
+            <button class="menu-item" data-action="insert-image">插入图片…</button>
+            <button class="menu-item" data-action="insert-camera">拍照插入</button>
+            <button class="menu-item" data-action="present">演示模式</button>
             <div class="menu-sec-title">账户</div>
             <button class="menu-item" data-action="account">登录 / 注册…</button>
             <button class="menu-item" data-action="logout">退出登录</button>
@@ -137,7 +146,7 @@
     </div>
       <div class="tb-user-wrap">
         <button id="btnUser" class="icon-btn" title="账户" aria-label="账户">
-          <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-5 8-5s8 1.7 8 5"/></svg>
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="8.2" r="3.8"/><path d="M4.8 20.2c.7-3.5 3.7-5.4 7.2-5.4s6.5 1.9 7.2 5.4"/></svg>
         </button>
         <div id="userMenu" class="menu hidden">
           <div class="user-info"><span class="user-name" id="userName"></span><span class="user-sub" id="userSub">未登录</span></div>
@@ -158,7 +167,7 @@
       </div>
       <div id="subjectList" class="subject-list"></div>
       <div id="noteSort" class="seg note-sort"></div>
-      <div class="note-search-wrap"><svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg><input id="noteSearch" type="search" placeholder="搜索笔记" autocomplete="off"></div>
+      <div class="note-search-wrap"><svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.6 4.6"/></svg><input id="noteSearch" type="search" placeholder="搜索笔记" autocomplete="off"></div>
       <div id="noteList" class="note-list"></div>
       <div class="lib-foot">
         <button id="btnNewSubject" class="mini-btn">＋ 项目</button>
@@ -168,20 +177,25 @@
 
     <!-- 画布区 -->
     <section id="canvas-area" class="canvas-area">
+      <div id="favoritesBar" class="favorites-bar hidden">
+        <div id="favList" class="fav-list"></div>
+        <button id="favAdd" class="fav-add" title="收藏当前工具" aria-label="收藏当前工具"><svg viewBox="0 0 24 24" class="ic"><path d="M12 5.5v13M5.5 12h13"/></svg></button>
+        <button id="favEdit" class="fav-add" title="编辑收藏（点击可删除）" aria-label="编辑收藏"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17zM13.5 6.5l3 3"/></svg></button>
+      </div>
       <div id="paperHolder" class="paper-holder">
         <canvas id="viewCanvas"></canvas>
         <div id="textLayer" class="text-layer"></div>
       </div>
       <div id="emptyState" class="empty-state hidden">
-        <div class="empty-icon"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg></div>
+        <div class="empty-icon"><svg viewBox="0 0 24 24" class="ic"><path d="M4.2 19.8l1.3-4.1L16.6 4.6a2 2 0 0 1 2.8 2.8L8.3 18.5l-4.1 1.3z"/><path d="M14.8 6.7l2.5 2.5"/></svg></div>
         <div class="empty-title">还没有笔记</div>
         <div class="empty-sub">点「＋ 笔记」新建一篇，或从左侧资料库打开</div>
         <button id="btnEmptyNew" class="mini-btn primary">＋ 新建笔记</button>
       </div>
       <div id="pageNav" class="page-nav">
-        <button id="btnPrevPage" class="icon-btn sm" aria-label="上一页"><svg viewBox="0 0 24 24" class="ic"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button id="btnPrevPage" class="icon-btn sm" aria-label="上一页"><svg viewBox="0 0 24 24" class="ic"><path d="M14.5 6l-6 6 6 6"/></svg></button>
         <span id="pageIndicator">1 / 1</span>
-        <button id="btnNextPage" class="icon-btn sm" aria-label="下一页"><svg viewBox="0 0 24 24" class="ic"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button id="btnNextPage" class="icon-btn sm" aria-label="下一页"><svg viewBox="0 0 24 24" class="ic"><path d="M9.5 6l6 6-6 6"/></svg></button>
       </div>
     </section>
 
@@ -209,10 +223,23 @@
       <button class="shape-btn" data-shape="ellipse">椭圆</button>
       <button class="shape-btn" data-shape="arrow">箭头</button>
     </div>
+    <div class="style-row hidden" id="styleRow"></div>
   </div>
 
+  <div id="presMode" class="pres-mode hidden">
+    <canvas id="presCanvas"></canvas>
+    <div class="pres-bar">
+      <span id="presLabel">1 / 1</span>
+      <button id="presPrev" class="icon-btn sm" aria-label="上一页"><svg viewBox="0 0 24 24" class="ic"><path d="M14.5 6l-6 6 6 6"/></svg></button>
+      <button id="presNext" class="icon-btn sm" aria-label="下一页"><svg viewBox="0 0 24 24" class="ic"><path d="M9.5 6l6 6-6 6"/></svg></button>
+      <button id="presClose" class="icon-btn sm" aria-label="退出演示"><svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg></button>
+    </div>
+  </div>
   <div id="toast" class="toast"></div>
   <input type="file" id="fileInput" accept=".note,.notebook,.json,application/json" hidden>
+<input type="file" id="imageInput" accept="image/*" hidden>
+<input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+<input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
   <div id="multiBar" class="multi-bar hidden">
     <span id="multiCount" class="multi-count">已选 0</span>
     <button class="mini-btn" id="multiMove">移动…</button>
@@ -224,11 +251,11 @@
   <div id="recPanel" class="rec-panel hidden">
     <div class="rec-head">
       <span class="rec-title">录音</span>
-      <button id="recClose" class="icon-btn sm" aria-label="关闭"><svg viewBox="0 0 24 24" class="ic"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button id="recClose" class="icon-btn sm" aria-label="关闭"><svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg></button>
     </div>
     <div class="rec-controls">
       <button id="recToggle" class="rec-btn" aria-label="开始录音">
-        <svg viewBox="0 0 24 24" class="ic"><path d="M12 3a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <svg viewBox="0 0 24 24" class="ic"><path d="M12 3.5a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0v-5a4 4 0 0 0-4-4z"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18.5V21"/></svg>
       </button>
       <div class="rec-timer" id="recTimer">0:00</div>
       <div class="rec-status" id="recStatus">未在录音</div>
@@ -253,6 +280,7 @@
   </div>
 </div>
 
+<script src="vendor/pdfjs/pdf.min.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

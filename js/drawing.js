@@ -55,6 +55,52 @@ export function drawPaper(ctx, style, color, w, h) {
     ctx.lineWidth = 1.6;
     ctx.beginPath(); ctx.moveTo(252, 0); ctx.lineTo(252, h); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, 824); ctx.lineTo(w, 824); ctx.stroke();
+  } else if (style === 'check') {
+    // checklist: checkbox + line
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1;
+    for (let y = LINE; y < h; y += LINE) {
+      ctx.strokeRect(20, y - 30, 22, 22);
+      ctx.beginPath(); ctx.moveTo(58, y - 19); ctx.lineTo(w, y - 19); ctx.stroke();
+    }
+  } else if (style === 'planner') {
+    // planner: weekday header + time grid
+    const cols = 7, cw = w / cols;
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= cols; i++) { ctx.moveTo(i * cw, 0); ctx.lineTo(i * cw, h); }
+    for (let y = 76; y < h; y += GRID * 2) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    ctx.stroke();
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(0, 76); ctx.lineTo(w, 76); ctx.stroke();
+  } else if (style === 'story') {
+    // storyboard: 2x3 frames
+    const rows = 3, cols = 2;
+    const bw = w / cols, bh = h / rows;
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      ctx.rect(c * bw + 10, r * bh + 10, bw - 20, bh - 46);
+    }
+    ctx.stroke();
+  } else if (style === 'music') {
+    // music: five-line staffs
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1;
+    for (let y = 60; y < h - 20; y += 92) {
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) { const yy = y + i * 11; ctx.moveTo(0, yy); ctx.lineTo(w, yy); }
+      ctx.stroke();
+    }
+  } else if (style === 'legal') {
+    // legal: numbered lines
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1;
+    let n = 1;
+    ctx.fillStyle = info.dot;
+    ctx.font = '10px sans-serif';
+    ctx.textBaseline = 'middle';
+    for (let y = LINE; y < h; y += LINE) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      ctx.fillText(String(n++), 16, y - LINE / 2);
+    }
   }
   return info;
 }
@@ -76,7 +122,7 @@ export function wrapText(ctx, text, maxW) {
 export function drawTextItem(ctx, t, font, w, h) {
   ctx.save();
   ctx.fillStyle = t.color;
-  ctx.font = `600 ${t.fontSize}px ${font}`;
+  ctx.font = `${t.italic ? 'italic ' : ''}${t.bold ? 700 : 400} ${t.fontSize}px ${font}`;
   ctx.textBaseline = 'top';
   const lines = wrapText(ctx, t.text, t.w * w);
   let y = t.y * h;
@@ -86,9 +132,111 @@ export function drawTextItem(ctx, t, font, w, h) {
     if (t.align === 'center') x += (t.w * w - ctx.measureText(ln).width) / 2;
     else if (t.align === 'right') x += t.w * w - ctx.measureText(ln).width;
     ctx.fillText(ln, x, y);
+    if (t.underline) {
+      const wd = ctx.measureText(ln).width;
+      ctx.strokeStyle = t.color;
+      ctx.lineWidth = Math.max(1, t.fontSize * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(x, y + t.fontSize * 1.18);
+      ctx.lineTo(x + wd, y + t.fontSize * 1.18);
+      ctx.stroke();
+    }
     y += lh;
   }
   ctx.restore();
+}
+
+function traceSmooth(ctx, pts) {
+  if (!pts || pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2;
+    const my = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+}
+
+/* pen/ballpen style rendering: dashed / dotted / pencil / brush */
+function drawStyledStroke(ctx, st) {
+  const pts = st.points;
+  const style = st.style;
+  const w = Math.max(1.4, st.width);
+  ctx.strokeStyle = st.color;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (style === 'dashed') {
+    ctx.setLineDash([14, 9]);
+    ctx.lineWidth = w;
+    traceSmooth(ctx, pts); ctx.stroke();
+  } else if (style === 'dotted') {
+    ctx.setLineDash([0.4, 11]);
+    ctx.lineWidth = Math.max(1.8, w * 1.25);
+    traceSmooth(ctx, pts); ctx.stroke();
+  } else if (style === 'pencil') {
+    ctx.setLineDash([1.6, 2.1]);
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = w * 1.15;
+    traceSmooth(ctx, pts); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = Math.max(1, w * 0.8);
+    traceSmooth(ctx, pts); ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else if (style === 'brush') {
+    const passes = [[w * 2.6, 0.10], [w * 1.8, 0.18], [w * 1.2, 0.42], [w, 0.92]];
+    for (const [pw, pa] of passes) {
+      ctx.globalAlpha = pa;
+      ctx.lineWidth = pw;
+      traceSmooth(ctx, pts); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.setLineDash([]);
+}
+
+const imgCache = new Map();
+export function loadPageImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const hit = imgCache.get(src);
+    if (hit && hit.loaded) return resolve(hit.img);
+    const im = new Image();
+    imgCache.set(src, { img: im, loaded: false });
+    im.onload = () => { const e = imgCache.get(src); if (e) e.loaded = true; resolve(im); };
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+function drawImageItem(ctx, item, w, h) {
+  const e = imgCache.get(item.src);
+  if (!e || !e.loaded) return;
+  const im = e.img;
+  const boxW = item.w * w, boxH = item.h * h;
+  const sc = Math.min(boxW / im.naturalWidth, boxH / im.naturalHeight) || 1;
+  const dw = im.naturalWidth * sc, dh = im.naturalHeight * sc;
+  const dx = item.x * w + (boxW - dw) / 2, dy = item.y * h + (boxH - dh) / 2;
+  ctx.save();
+  if (item.rot) {
+    ctx.translate(dx + dw / 2, dy + dh / 2);
+    ctx.rotate(item.rot * Math.PI / 180);
+    ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
+  } else {
+    ctx.drawImage(im, dx, dy, dw, dh);
+  }
+  ctx.restore();
+}
+export function drawPageMedia(ctx, page, w, h, onLoaded) {
+  if (page.bg && typeof page.bg.src === 'string') {
+    const e = imgCache.get(page.bg.src);
+    if (e && e.loaded) ctx.drawImage(e.img, 0, 0, w, h);
+    else loadPageImage(page.bg.src).then((img) => { if (img && onLoaded) onLoaded(); });
+  }
+  for (const item of page.images || []) {
+    const e = imgCache.get(item.src);
+    if (e && e.loaded) drawImageItem(ctx, item, w, h);
+    else loadPageImage(item.src).then((img) => { if (img && onLoaded) onLoaded(); });
+  }
 }
 
 export function drawStroke(ctx, st, info, font) {
@@ -110,6 +258,11 @@ export function drawStroke(ctx, st, info, font) {
       if (i === pts.length - 1) ctx.lineTo(p.x, p.y);
     }
     ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (st.style && st.style !== 'normal' && (st.tool === 'pen' || st.tool === 'ballpen')) {
+    drawStyledStroke(ctx, st);
     ctx.restore();
     return;
   }
@@ -218,6 +371,7 @@ export function renderPageToCanvas(canvas, page, paper, targetW, font) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(rs, 0, 0, rs, 0, 0);
   const info = drawPaper(ctx, paper.style, paper.color, PAGE_W, PAGE_H);
+  drawPageMedia(ctx, page, PAGE_W, PAGE_H, null);
   for (const st of page.strokes) drawStroke(ctx, st, info, font);
   for (const t of page.texts) drawTextItem(ctx, t, font, PAGE_W, PAGE_H);
   return canvas;
@@ -353,6 +507,7 @@ export class DrawingEngine {
         this.currentStroke = {
           id: 's' + Math.random().toString(36).slice(2, 10),
           tool: settings.tool, color: settings.color, width: settings.width,
+          style: settings.style || 'normal',
           points: [this.snapPoint(w, settings.tool, this.pressure(e))]
         };
         break;
@@ -645,6 +800,10 @@ export class DrawingEngine {
       const box = { x: t.x * PAGE_W, y: t.y * PAGE_H, w: t.w * PAGE_W, h: t.h * PAGE_H };
       if (this.polyIntersectsBox(path, box)) ids.add('t:' + t.id);
     }
+    for (const im of this.page.images || []) {
+      const box = { x: im.x * PAGE_W, y: im.y * PAGE_H, w: im.w * PAGE_W, h: im.h * PAGE_H };
+      if (this.polyIntersectsBox(path, box)) ids.add('i:' + im.id);
+    }
     this.selection = ids.size ? { ids: [...ids], box: this.computeBox(ids), moving: false, offset: null } : null;
     this.dirtyView = true;
     this.requestFrame();
@@ -683,7 +842,12 @@ export class DrawingEngine {
   computeBox(ids) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const id of ids) {
-      if (id.startsWith('t:')) {
+      if (id.startsWith('i:')) {
+        const im = this.page.images.find(x => x.id === id.slice(2));
+        if (!im) continue;
+        minX = Math.min(minX, im.x * PAGE_W); minY = Math.min(minY, im.y * PAGE_H);
+        maxX = Math.max(maxX, (im.x + im.w) * PAGE_W); maxY = Math.max(maxY, (im.y + im.h) * PAGE_H);
+      } else if (id.startsWith('t:')) {
         const t = this.page.texts.find(x => x.id === id.slice(2));
         if (!t) continue;
         minX = Math.min(minX, t.x * PAGE_W); minY = Math.min(minY, t.y * PAGE_H);
@@ -719,7 +883,11 @@ export class DrawingEngine {
     const dx = sel.offset.dx, dy = sel.offset.dy;
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) { sel.moving = false; this.dirtyView = true; return; }
     for (const id of sel.ids) {
-      if (id.startsWith('t:')) {
+      if (id.startsWith('i:')) {
+        const im = this.page.images.find(x => x.id === id.slice(2));
+        if (!im) continue;
+        im.x += dx / PAGE_W; im.y += dy / PAGE_H;
+      } else if (id.startsWith('t:')) {
         const t = this.page.texts.find(x => x.id === id.slice(2));
         if (!t) continue;
         t.x += dx / PAGE_W; t.y += dy / PAGE_H;
@@ -746,6 +914,8 @@ export class DrawingEngine {
     const c = this.rctx;
     c.setTransform(rs, 0, 0, rs, 0, 0);
     const info = drawPaper(c, paper.style, paper.color, PAGE_W, PAGE_H);
+    const pid = this.page.id;
+    drawPageMedia(c, this.page, PAGE_W, PAGE_H, () => { if (this.page && this.page.id === pid) this.invalidateRaster(); });
     for (const st of this.page.strokes) drawStroke(c, st, info, this.cb.getFont());
     for (const t of this.page.texts) drawTextItem(c, t, this.cb.getFont(), PAGE_W, PAGE_H);
     this.dirtyRaster = false;

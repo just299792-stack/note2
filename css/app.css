@@ -753,3 +753,79 @@ button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .r
   letter-spacing: .08em; padding: 10px 10px 2px;
 }
 
+/* ============ v4.26?????? / ?? / ?? / ?? / ???? / ?? / ?? ============ */
+.favorites-bar {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+  background: var(--bg-elev); border-bottom: 1px solid var(--border);
+  overflow-x: auto; flex: none; min-height: 40px;
+}
+.fav-list { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0; }
+.fav-chip {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  color: var(--text-2); background: var(--bg-elev2); border: 1px solid var(--border);
+  transition: background .15s, transform .12s;
+}
+.fav-chip:hover { background: var(--accent-soft); color: var(--accent); transform: translateY(-1px); }
+.fav-chip.active { background: var(--accent); color: #fff; border-color: transparent; }
+.fav-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.fav-add {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 30px; height: 30px; border-radius: 9px; color: var(--text-2);
+  background: var(--bg-elev2); border: 1px solid var(--border);
+}
+.fav-add:hover { background: var(--accent-soft); color: var(--accent); }
+.fav-add.active { background: var(--accent); color: #fff; border-color: transparent; }
+body.fav-editing .fav-chip { outline: 1px dashed rgba(220,38,38,.55); }
+body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc2626; }
+
+.style-row { display: flex; gap: 5px; padding: 6px 10px 8px; flex-wrap: wrap; }
+.style-btn {
+  flex: 1; min-width: 46px; padding: 5px 6px; border-radius: 8px; font-size: 11px; font-weight: 600;
+  color: var(--text-2); background: var(--bg-elev2); border: 1px solid var(--border);
+}
+.style-btn.active { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 700; }
+
+.text-style-bar {
+  position: absolute; z-index: 30; display: flex; align-items: center; gap: 3px;
+  padding: 4px 6px; border-radius: 10px; background: var(--bg-elev);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  transform: translateY(-100%); white-space: nowrap; max-width: 92vw; overflow-x: auto;
+}
+.ts-btn {
+  flex: none; min-width: 26px; height: 26px; padding: 0 6px; border-radius: 7px;
+  font-size: 11.5px; font-weight: 600; color: var(--text-2);
+  background: var(--bg-elev2); border: 1px solid var(--border);
+}
+.ts-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
+.ts-preset { font-size: 11px; }
+.ts-size { font-size: 10.5px; min-width: 34px; }
+.ts-color { min-width: 18px; width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1px solid rgba(0,0,0,.18); }
+.ts-color.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ts-align { font-size: 11px; min-width: 24px; }
+
+.rec-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rec-wave {
+  width: 100%; height: 28px; border-radius: 6px; cursor: pointer;
+  background: var(--bg-elev2); border: 1px solid var(--border);
+}
+.rec-wave:hover { border-color: var(--accent); }
+
+.pres-mode {
+  position: fixed; inset: 0; z-index: 200; background: rgba(8,10,14,.96);
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+}
+.pres-mode canvas { border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,.6); max-width: 96vw; max-height: 88vh; cursor: pointer; }
+.pres-bar {
+  display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.85);
+  font-size: 13px; font-weight: 600;
+}
+.pres-bar .icon-btn { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; }
+
+.snap-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.snap-info { flex: 1; font-size: 12.5px; color: var(--text-2); }
+.snap-row .mini-btn { flex: none; }
+
+.pres-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.pres-row input.pres-name { flex: 1; min-width: 0; }
+.pres-chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); flex: none; }
