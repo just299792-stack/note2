@@ -244,6 +244,7 @@ export class DrawingEngine {
     this.eraseIds = new Set();
     this.erasePath = null;
     this.lastMoveTs = 0;
+    this.dwellTimer = null;
     this.selection = null;
     this.playbackLock = false;
     this._raf = 0;
@@ -281,6 +282,7 @@ export class DrawingEngine {
     c.removeEventListener('contextmenu', this._cx);
     window.removeEventListener('resize', this._rs);
     if (window.visualViewport) window.visualViewport.removeEventListener('resize', this._rs);
+    this.clearDwell();
   }
 
   /* -------- 视图 -------- */
@@ -411,6 +413,7 @@ export class DrawingEngine {
         pen.points.push(np);
         this.lastMoveTs = Date.now();
         this.dirtyView = true;
+        this.armDwell();
       }
     } else if (settings.tool === 'eraser' || settings.tool === 'pixelEraser') {
       if (this.erasePath && Math.hypot(w.x - this.lastErase.x, w.y - this.lastErase.y) >= 6) {
@@ -439,6 +442,7 @@ export class DrawingEngine {
 
   onPointerUp(e) {
     if (!this.pointers.has(e.pointerId)) return;
+    this.clearDwell();
     const settings = this.cb.getSettings();
     const L = this.local(e);
     const w = this.screenToWorld(L.x, L.y);
@@ -500,6 +504,26 @@ export class DrawingEngine {
     this.requestFrame();
   }
 
+  /* -------- dwell shape auto-recognize (while holding) -------- */
+  armDwell() {
+    this.clearDwell();
+    this.dwellTimer = setTimeout(() => this.onDwell(), 250);
+  }
+  clearDwell() {
+    if (this.dwellTimer) { clearTimeout(this.dwellTimer); this.dwellTimer = null; }
+  }
+  onDwell() {
+    this.dwellTimer = null;
+    const pen = this.currentStroke;
+    if (!pen || (pen.tool !== 'pen' && pen.tool !== 'ballpen') || pen.points.length < 5) return;
+    if (!this.cb.onDwellCheck) return;
+    if (this.cb.onDwellCheck(pen)) {
+      this.currentStroke = null;
+      this.dirtyView = true;
+      this.requestFrame();
+    }
+  }
+
   pressure(e) {
     if (e.pointerType === 'touch') return 1;
     if (e.pointerType === 'pen') return Math.max(0.15, Math.min(1, e.pressure || 0.6));
@@ -517,6 +541,7 @@ export class DrawingEngine {
       startA: { x: a.x, y: a.y }, startB: { x: b.x, y: b.y },
       maxMove: 0
     };
+    this.clearDwell();
     this.currentStroke = null; this.lassoPath = null; this.curShape = null; this.textTap = null;
     this.dirtyView = true;
   }
@@ -816,6 +841,7 @@ export class DrawingEngine {
   setPage(page) {
     this.page = page;
     this.selection = null; this.currentStroke = null; this.lassoPath = null; this.curShape = null;
+    this.clearDwell();
     this.eraseIds = new Set(); this.textTap = null; this.erasePath = null;
     this.dirtyRaster = true; this.dirtyView = true;
     this.requestFrame();

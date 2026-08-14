@@ -1,7 +1,6 @@
 ﻿/* =========================================================
    笔记 —— 数据模型 + 存储层 (IndexedDB)
    ========================================================= */
-import { PAGE_W, PAGE_H } from './drawing.js';
 
 export const LIB_VERSION = 4;
 
@@ -15,14 +14,6 @@ export function newId() {
 export function newLibrary() {
   const subjId = newId();
   const nbId = newId();
-  const note = newNote(nbId, '欢迎使用笔记 ✍️');
-  note.paper = { style: 'line', color: 'white' };
-  const p = note.pages[0];
-  p.strokes = demoStrokes();
-  p.texts = [
-    { id: newId(), x: 0.10, y: 0.08, w: 0.62, h: 0.09, text: '欢迎使用「笔记」', fontSize: 42, color: '#1e293b', align: 'left' },
-    { id: newId(), x: 0.10, y: 0.16, w: 0.8, h: 0.07, text: '用 Apple Pencil 写下一笔，开始你的第一篇笔记 ✍️', fontSize: 24, color: '#64748b', align: 'left' }
-  ];
   return {
     version: LIB_VERSION,
     settings: {
@@ -34,10 +25,10 @@ export function newLibrary() {
       theme: 'auto'
     },
     subjects: [
-      { id: subjId, name: '我的项目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [note.id] } ] }
+      { id: subjId, name: '我的项目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [] } ] }
     ],
-    notes: { [note.id]: note },
-    active: { subjectId: subjId, notebookId: nbId, noteId: note.id, pageIndex: 0 }
+    notes: {},
+    active: { subjectId: subjId, notebookId: nbId, noteId: null, pageIndex: 0 }
   };
 }
 
@@ -53,34 +44,6 @@ export function newNote(notebookId, title, paper) {
 
 export function newPage() {
   return { id: newId(), strokes: [], texts: [] };
-}
-
-/* ---------- 示例笔画 ---------- */
-function demoStrokes() {
-  const mk = (tool, color, width, pts) => ({ id: newId(), tool, color, width, points: pts });
-  const pts = (xs) => xs.map(([x, y, p]) => ({ x: x * PAGE_W, y: y * PAGE_H, p: p ?? 1 }));
-  return [
-    mk('pen', '#1e293b', 5, pts([
-      [0.10, 0.34],[0.115,0.345],[0.13,0.35],[0.15,0.356],[0.17,0.362],[0.19,0.368],[0.21,0.372],[0.24,0.376],
-      [0.27,0.38],[0.30,0.383],[0.33,0.385],[0.36,0.386],[0.39,0.387],[0.42,0.388],[0.45,0.388],[0.48,0.387],
-      [0.51,0.386],[0.54,0.384],[0.57,0.382],[0.60,0.379],[0.63,0.375],[0.66,0.371],[0.69,0.366],[0.72,0.36]
-    ])),
-    mk('highlighter', '#fbbf24', 16, pts([
-      [0.10, 0.47],[0.14,0.472],[0.18,0.474],[0.22,0.475],[0.27,0.476],[0.33,0.477],[0.39,0.477],[0.46,0.476],
-      [0.53,0.475],[0.60,0.474],[0.68,0.472],[0.76,0.47]
-    ])),
-    mk('pen', '#2563eb', 5, pts([
-      [0.10, 0.58],[0.115,0.575],[0.13,0.57],[0.15,0.562],[0.17,0.552],[0.19,0.542],[0.21,0.532],[0.24,0.52],
-      [0.27,0.508],[0.30,0.497],[0.33,0.487],[0.36,0.478],[0.39,0.47],[0.42,0.463],[0.45,0.457],[0.48,0.452],
-      [0.51,0.448],[0.54,0.445],[0.57,0.443],[0.60,0.442],[0.63,0.442],[0.66,0.443],[0.69,0.445],[0.72,0.448],
-      [0.75,0.452],[0.78,0.457],[0.81,0.463]
-    ])),
-    mk('pen', '#dc2626', 4, pts([
-      [0.10, 0.70],[0.115,0.695],[0.13,0.688],[0.15,0.68],[0.17,0.67],[0.19,0.66],[0.21,0.648],[0.24,0.634],
-      [0.27,0.62],[0.30,0.606],[0.33,0.594],[0.36,0.584],[0.39,0.576],[0.42,0.57],[0.45,0.566],[0.48,0.563],
-      [0.51,0.562],[0.54,0.562],[0.57,0.564],[0.60,0.567],[0.63,0.572],[0.66,0.578],[0.69,0.585],[0.72,0.594]
-    ]))
-  ];
 }
 
 /* ---------- IndexedDB ---------- */

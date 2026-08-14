@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.24';
+const APP_VERSION = '4.25';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -37,7 +37,6 @@ const state = {
 let history = [];
 let histIdx = -1;
 let saveTimer = null;
-let firstRun = false;
 
 /* ---------------- 工具 ---------------- */
 function currentNote() { return state.lib && state.activeNoteId ? state.lib.notes[state.activeNoteId] : null; }
@@ -59,25 +58,15 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   getSettings: settings,
   getFont: () => FONT,
   onStrokeDone: (st, holdMs) => {
-    recCapture('stroke', st);
     const hold = holdMs || 0;
-    if (hold >= 250 && (st.tool === 'pen' || st.tool === 'ballpen')) {
-      const det = detectShape(st.points);
-      if (det) {
-        const shapeStroke = { id: st.id, tool: 'pen', shape: det.kind, color: st.color, width: st.width, points: det.points };
-        mutate(() => {
-          const page = currentPage();
-          page.strokes = page.strokes.filter(s => s.id !== st.id);
-          page.strokes.push(shapeStroke);
-        }, '形状识别');
-        const names = { line: '直线', curve: '曲线', polygon: '多边形', ellipse: '椭圆', rect: '长方形', square: '正方形', circle: '圆形' };
-        toast('已识别为' + (names[det.kind] || det.kind));
-        maybeAutoAdvance(shapeStroke);
-        return;
-      }
-    }
+    if (hold >= 250 && (st.tool === 'pen' || st.tool === 'ballpen') && tryRecognizeShape(st)) return;
+    recCapture('stroke', st);
     mutate(() => currentPage().strokes.push(st), '书写');
     maybeAutoAdvance(st);
+  },
+  onDwellCheck: (st) => {
+    if (st.tool !== 'pen' && st.tool !== 'ballpen') return false;
+    return tryRecognizeShape(st);
   },
   onShapeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '形状'); },
   onEraseDone: (ids) => {
@@ -122,6 +111,20 @@ const engine = new DrawingEngine($('#viewCanvas'), {
 let moveBefore = null;
 
 /* ---------------- 形状识别 ---------------- */
+const SHAPE_NAMES = { line: '直线', curve: '曲线', polygon: '多边形', ellipse: '椭圆', rect: '长方形', square: '正方形', circle: '圆形' };
+
+/* 自动识别形状：按住 250ms（不松手）或松手时都会调用 */
+function tryRecognizeShape(st) {
+  const det = detectShape(st.points);
+  if (!det) return false;
+  const shapeStroke = { id: st.id, tool: 'pen', shape: det.kind, color: st.color, width: st.width, points: det.points };
+  recCapture('stroke', shapeStroke);
+  mutate(() => currentPage().strokes.push(shapeStroke), '形状识别');
+  toast('已识别为' + (SHAPE_NAMES[det.kind] || det.kind));
+  maybeAutoAdvance(shapeStroke);
+  return true;
+}
+
 function detectShape(points) {
   if (!points || points.length < 5) return null;
   const n = points.length;
@@ -1964,9 +1967,8 @@ async function loadServerLibrary() {
   if (r.ok && r.library) {
     state.lib = sanitize(r.library);
   } else {
-    // 新账号：从欢迎笔记开始（本机笔记可通过「导出/导入 .notebook」迁移，避免账号间串数据）
+    // 新账号：从空白资料库开始（本机笔记可通过「导出/导入 .notebook」迁移，避免账号间串数据）
     state.lib = newLibrary();
-    firstRun = true;
     await api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) });
   }
   state.lib = sanitize(state.lib);
@@ -2271,7 +2273,7 @@ async function init() {
       const bak = loadLocalBackup();
       if (bak) { lib = bak; toast('检测到本地备份，已自动恢复数据'); }
     }
-    if (!lib) { lib = newLibrary(); firstRun = true; }
+    if (!lib) { lib = newLibrary(); }
     state.lib = lib;
     applySettingsFromLib(lib);
     saveLibrary(lib);
@@ -2307,11 +2309,6 @@ async function init() {
   engine.invalidateRaster();
   registerSW();
 
-  if (firstRun) {
-    setTimeout(() => {
-      toast('欢迎使用「笔记」！用 Apple Pencil 或鼠标书写 ✍️');
-    }, 600);
-  }
   // 记录首启
   try { if (!localStorage.getItem('note2-seen')) { localStorage.setItem('note2-seen', '1'); } } catch (_) {}
   // 调试句柄（供测试/排查使用）

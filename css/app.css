@@ -738,8 +738,8 @@ body.theme-light .topbar {
 .note-item.multi { cursor: pointer; }
 
 /* 笔记排序条 */
-.note-sort { margin: 0 10px 8px; }
-.note-sort button { padding: 5px 4px; font-size: 11.5px; }
+.note-sort { margin: 0 10px 6px; gap: 3px; }
+.note-sort button { padding: 3px 2px; font-size: 10.5px; border-radius: 6px; line-height: 1.3; }
 
 /* ============ 触摸体验优化 ============ */
 body { -webkit-touch-callout: none; }
