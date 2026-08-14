@@ -192,8 +192,6 @@ export class DrawingEngine {
     this.lassoPath = null;
     this.eraseIds = new Set();
     this.selection = null;
-    this.loupeOn = false;
-    this.loupeEl = null;
     this._raf = 0;
     this._rect = null;
 
@@ -295,8 +293,6 @@ export class DrawingEngine {
           tool: settings.tool, color: settings.color, width: settings.width,
           points: [this.snapPoint(w, settings.tool, this.pressure(e))]
         };
-        this.loupeOn = !!settings.loupe && settings.tool === 'pen';
-        if (this.loupeEl) this.loupeEl.classList.remove('hidden');
         break;
       case 'eraser':
         this.eraseIds = new Set();
@@ -345,10 +341,11 @@ export class DrawingEngine {
 
     if (pen) {
       const last = pen.points[pen.points.length - 1];
-      const np = this.snapPoint(w, pen.tool, this.pressure(e));
+      const rawP = this.pressure(e);
+      const filtP = rawP * 0.4 + (last.p || 1) * 0.6;   // 压力低通滤波，去抖动
+      const np = this.snapPoint(w, pen.tool, filtP);
       if (Math.hypot(np.x - last.x, np.y - last.y) >= MIN_DIST) {
         pen.points.push(np);
-        this.updateLoupe(w, nx, ny);
         this.dirtyView = true;
       }
     } else if (settings.tool === 'eraser') {
@@ -397,8 +394,6 @@ export class DrawingEngine {
     if (this.currentStroke) {
       const st = this.currentStroke;
       this.currentStroke = null;
-      this.loupeOn = false;
-      if (this.loupeEl) this.loupeEl.classList.add('hidden');
       if (st.points.length >= 2) this.cb.onStrokeDone(st);
       else this.dirtyView = true;
     } else if (settings.tool === 'eraser') {
@@ -451,8 +446,6 @@ export class DrawingEngine {
       maxMove: 0
     };
     this.currentStroke = null; this.lassoPath = null; this.curShape = null; this.textTap = null;
-    this.loupeOn = false;
-    if (this.loupeEl) this.loupeEl.classList.add('hidden');
     this.dirtyView = true;
   }
 
@@ -491,7 +484,7 @@ export class DrawingEngine {
 
   /* -------- 橡皮擦 -------- */
   hitErase(x, y) {
-    const radius = 26;
+    const radius = this.cb.getSettings().eraserSize || 26;
     const strokes = this.page.strokes;
     const last = this.lastErase || { x, y };
     const segs = Math.hypot(x - last.x, y - last.y) > 8 ? this.sampleLine(last.x, last.y, x, y, 8) : [{ x, y }];
@@ -686,7 +679,6 @@ export class DrawingEngine {
     this.drawLiveInk(c);
     this.drawSelection(c);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.drawLoupe();
     this.dirtyView = false;
   }
 
@@ -748,50 +740,11 @@ export class DrawingEngine {
     c.restore();
   }
 
-  /* -------- 放大镜 -------- */
-  updateLoupe(w, sx, sy) {
-    if (!this.loupeOn || !this.loupeEl) return;
-    const size = 150;
-    let x = sx + 28, y = sy - size - 20;
-    if (x + size > this.cw - 8) x = sx - size - 28;
-    if (y < 8) y = sy + 24;
-    this.loupeEl.style.left = x + 'px';
-    this.loupeEl.style.top = y + 'px';
-  }
-
-  drawLoupe() {
-    const el = this.loupeEl;
-    if (!el || !this.loupeOn || el.classList.contains('hidden')) return;
-    const lc = el.querySelector('canvas');
-    const size = 150, zoom = 2.1;
-    lc.width = Math.round(size * zoom); lc.height = Math.round(size * zoom);
-    const lctx = lc.getContext('2d');
-    const rect = this.canvas.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const cx = elRect.left - rect.left + size / 2;
-    const cy = elRect.top - rect.top + size / 2;
-    const w = this.screenToWorld(cx, cy);
-    lctx.clearRect(0, 0, lc.width, lc.height);
-    const sw = size / (this.scale * zoom);
-    const sh = size / (this.scale * zoom);
-    const srcX = (w.x - sw / 2) * this.scale + this.ox;
-    const srcY = (w.y - sh / 2) * this.scale + this.oy;
-    lctx.drawImage(this.canvas, srcX * this.dpr, srcY * this.dpr, sw * this.scale * this.dpr, sh * this.scale * this.dpr, 0, 0, lc.width, lc.height);
-    lctx.strokeStyle = 'rgba(37,99,235,.55)';
-    lctx.lineWidth = 1;
-    lctx.beginPath();
-    lctx.moveTo(lc.width / 2, 0); lctx.lineTo(lc.width / 2, lc.height);
-    lctx.moveTo(0, lc.height / 2); lctx.lineTo(lc.width, lc.height / 2);
-    lctx.stroke();
-  }
-
   /* -------- 对外 -------- */
   setPage(page) {
     this.page = page;
     this.selection = null; this.currentStroke = null; this.lassoPath = null; this.curShape = null;
     this.eraseIds = new Set(); this.textTap = null;
-    this.loupeOn = false;
-    if (this.loupeEl) this.loupeEl.classList.add('hidden');
     this.dirtyRaster = true; this.dirtyView = true;
     this.requestFrame();
   }
@@ -802,6 +755,7 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
 
 
 

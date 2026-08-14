@@ -3,7 +3,7 @@
    ========================================================= */
 import { PAGE_W, PAGE_H } from './drawing.js';
 
-export const LIB_VERSION = 2;
+export const LIB_VERSION = 3;
 
 let _idc = 0;
 export function newId() {
@@ -25,7 +25,13 @@ export function newLibrary() {
   ];
   return {
     version: LIB_VERSION,
-    settings: { fingerDraw: false, loupe: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line' },
+    settings: {
+      fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
+      penWidth: 5, hlWidth: 14, hlColor: '#fde047',
+      toolbar: 'left', eraserSize: 24,
+      defaultPaper: { style: 'line', color: 'white' },
+      autoPage: true, twoFingerUndo: true
+    },
     subjects: [
       { id: subjId, name: '我的科目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [note.id] } ] }
     ],
@@ -34,12 +40,12 @@ export function newLibrary() {
   };
 }
 
-export function newNote(notebookId, title) {
+export function newNote(notebookId, title, paper) {
   const now = Date.now();
   return {
     id: newId(), notebookId, title: title || '未命名笔记',
     createdAt: now, updatedAt: now,
-    paper: { style: 'line', color: 'white' },
+    paper: paper || { style: 'line', color: 'white' },
     pages: [ newPage() ]
   };
 }
@@ -135,9 +141,22 @@ export function sanitize(raw) {
   if (!raw || typeof raw !== 'object') return newLibrary();
   const lib = raw;
   lib.version = LIB_VERSION;
-  lib.settings = Object.assign({ fingerDraw: false, loupe: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line' }, lib.settings || {});
-  // v1 -> v2：旧版本默认关闭放大镜（用户仍可在菜单里打开）
-  if (raw.version < 2) lib.settings.loupe = false;
+  lib.settings = Object.assign({
+    fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
+    penWidth: 5, hlWidth: 14, hlColor: '#fde047',
+    toolbar: 'left', eraserSize: 24,
+    defaultPaper: { style: 'line', color: 'white' },
+    autoPage: true, twoFingerUndo: true
+  }, lib.settings || {});
+  // v1/v2 -> v3：彻底移除放大镜，补充新设置字段
+  if (raw.version < 3) {
+    delete lib.settings.loupe;
+    if (!lib.settings.toolbar) lib.settings.toolbar = 'left';
+    if (!lib.settings.eraserSize) lib.settings.eraserSize = 24;
+    if (!lib.settings.defaultPaper) lib.settings.defaultPaper = { style: 'line', color: 'white' };
+    if (lib.settings.autoPage === undefined) lib.settings.autoPage = true;
+    if (lib.settings.twoFingerUndo === undefined) lib.settings.twoFingerUndo = true;
+  }
   if (!Array.isArray(lib.subjects) || lib.subjects.length === 0) {
     const subjId = newId(); const nbId = newId();
     lib.subjects = [{ id: subjId, name: '我的科目', notebooks: [{ id: nbId, name: '导入的笔记本', noteIds: [] }] }];
@@ -198,6 +217,7 @@ export function listNotes(lib, notebookId) {
   if (!f) return [];
   return f.notebook.noteIds.map(id => lib.notes[id]).filter(Boolean);
 }
+
 
 
 

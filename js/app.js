@@ -5,7 +5,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '3.3';
+const APP_VERSION = '4.0';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -38,7 +38,7 @@ function settings() {
     tool: state.tool, color: state.color, shape: state.shape,
     width: state.widths[state.tool] || 5,
     fingerDraw: !!state.lib.settings.fingerDraw,
-    loupe: !!state.lib.settings.loupe
+    eraserSize: state.lib.settings.eraserSize || 24
   };
 }
 
@@ -63,12 +63,13 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     saveSoon(true);
   },
   onTextTap: (w) => createTextEdit(w),
-  onTwoFingerTap: () => undo()
+  onTwoFingerTap: () => { if (state.lib.settings.twoFingerUndo !== false) undo(); }
 });
 let moveBefore = null;
 
 /* ---------------- 自动翻页（写到页尾时） ---------------- */
 function maybeAutoAdvance(st) {
+  if (state.lib.settings.autoPage === false) return;
   if (!st || st.shape) return;
   let maxY = 0;
   for (const p of st.points) maxY = Math.max(maxY, p.y);
@@ -364,10 +365,20 @@ function bindUI() {
     if (act === 'add-page') addPage();
     if (act === 'duplicate-page') duplicatePage();
     if (act === 'delete-page') deletePage();
+    if (act === 'account') { if (state.auth) logout(true); else openAuthModal('login'); }
+    if (act === 'logout') logout(true);
     if (act === 'about') aboutModal();
   });
   $('#optFinger').addEventListener('change', (e) => { state.lib.settings.fingerDraw = e.target.checked; saveLibrary(state.lib); });
-  $('#optLoupe').addEventListener('change', (e) => { state.lib.settings.loupe = e.target.checked; saveLibrary(state.lib); });
+  $('#optTwoFinger').addEventListener('change', (e) => { state.lib.settings.twoFingerUndo = e.target.checked; saveLibrary(state.lib); });
+  $('#optAutoPage').addEventListener('change', (e) => { state.lib.settings.autoPage = e.target.checked; saveLibrary(state.lib); });
+  // 设置面板：打开时刷新 + 工具栏布局
+  $('#btnMore').addEventListener('click', (e) => {
+    e.stopPropagation();
+    renderSettings();
+    $('#moreMenu').classList.toggle('hidden');
+  });
+  window.addEventListener('resize', applyToolbarLayout);
   // 页面导航
   $('#btnPrevPage').addEventListener('click', () => switchPage(state.pageIndex - 1));
   $('#btnNextPage').addEventListener('click', () => switchPage(state.pageIndex + 1));
@@ -522,6 +533,107 @@ function updatePaperUI() {
   }
 }
 
+/* ---------------- 设置面板与工具栏布局 ---------------- */
+function applyToolbarLayout() {
+  const want = state.lib.settings.toolbar || 'left';
+  const eff = (want === 'top' || window.innerWidth <= 820) ? 'top' : want;
+  document.body.classList.remove('toolbar-top', 'toolbar-left', 'toolbar-bottom');
+  document.body.classList.add('toolbar-' + eff);
+}
+
+function renderSettings() {
+  const st = state.lib.settings;
+  // 钢笔默认色
+  const penBox = $('#penColors');
+  if (penBox) {
+    penBox.innerHTML = '';
+    PEN_COLORS.forEach(c => {
+      const sw = document.createElement('button');
+      sw.className = 'swatch' + (state.colors.pen === c ? ' active' : '');
+      sw.style.background = c;
+      sw.addEventListener('click', () => {
+        state.colors.pen = c;
+        if (state.tool === 'pen') { state.color = c; st.color = c; updateColorUI(); }
+        st.penColor = c;
+        saveLibrary(state.lib);
+        renderSettings();
+      });
+      penBox.appendChild(sw);
+    });
+  }
+  // 荧光笔默认色
+  const hlBox = $('#hlColors');
+  if (hlBox) {
+    hlBox.innerHTML = '';
+    HL_COLORS.forEach(c => {
+      const sw = document.createElement('button');
+      sw.className = 'swatch' + (state.colors.highlighter === c ? ' active' : '');
+      sw.style.background = c;
+      sw.addEventListener('click', () => {
+        state.colors.highlighter = c;
+        if (state.tool === 'highlighter') { state.color = c; st.hlColor = c; updateColorUI(); }
+        st.hlColor = c;
+        saveLibrary(state.lib);
+        renderSettings();
+      });
+      hlBox.appendChild(sw);
+    });
+  }
+  // 橡皮擦大小
+  const erBox = $('#eraserSizes');
+  if (erBox) {
+    erBox.innerHTML = '';
+    [[16, '小'], [26, '中'], [36, '大']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = st.eraserSize === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.eraserSize = v; saveLibrary(state.lib); renderSettings(); });
+      erBox.appendChild(b);
+    });
+  }
+  // 新笔记默认纸张
+  const dp = $('#defaultPaperRow');
+  if (dp) {
+    dp.innerHTML = '';
+    const dPaper = st.defaultPaper || { style: 'line', color: 'white' };
+    const row = document.createElement('div');
+    row.className = 'paper-row';
+    PAPER_STYLES.forEach(ps => {
+      const b = document.createElement('button');
+      b.className = 'paper-style' + (dPaper.style === ps.id ? ' active' : '');
+      b.title = ps.name;
+      if (ps.id !== 'blank') b.innerHTML = `<div class="${ps.id === 'line' ? 'lines' : ps.id === 'grid' ? 'grid' : 'dots'}"></div>`;
+      b.addEventListener('click', () => { st.defaultPaper = { style: ps.id, color: dPaper.color }; saveLibrary(state.lib); renderSettings(); });
+      row.appendChild(b);
+    });
+    dp.appendChild(row);
+    const colors = document.createElement('div');
+    colors.className = 'paper-colors';
+    PAPER_COLORS.forEach(c => {
+      const sw = document.createElement('button');
+      sw.className = 'paper-color' + (dPaper.color === c ? ' active' : '');
+      const info = paperInfo(c);
+      sw.style.background = info.bg;
+      sw.title = info.name;
+      sw.addEventListener('click', () => { st.defaultPaper = { style: dPaper.style, color: c }; saveLibrary(state.lib); renderSettings(); });
+      colors.appendChild(sw);
+    });
+    dp.appendChild(colors);
+  }
+  // 工具条位置
+  const pos = $('#toolbarPos');
+  if (pos) {
+    pos.innerHTML = '';
+    [['top', '顶部'], ['left', '左侧'], ['bottom', '底部']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = st.toolbar === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.toolbar = v; saveLibrary(state.lib); applyToolbarLayout(); renderSettings(); });
+      pos.appendChild(b);
+    });
+  }
+}
+
 function setPaper(style, color) {
   const note = currentNote();
   if (!note) return;
@@ -580,10 +692,13 @@ function renderLibrary() {
     if (!state.collapsedSubjects.has(subj.id)) {
       const nbs = document.createElement('div');
       nbs.className = 'notebooks';
+      let nbi = 0;
       for (const nb of subj.notebooks) {
         const b = document.createElement('button');
         b.className = 'notebook' + (nb.id === state.activeNotebookId ? ' active' : '');
         b.innerHTML = `<span class="nb-icon"></span><span class="nb-name"></span>`;
+        const hue = (nbi++ * 47) % 360;
+        b.querySelector('.nb-icon').style.background = `linear-gradient(135deg, hsl(${hue},78%,60%), hsl(${(hue + 45) % 360},72%,52%))`;
         b.querySelector('.nb-icon').textContent = nb.name.slice(0, 1);
         b.querySelector('.nb-name').textContent = nb.name;
         b.addEventListener('click', (e) => {
@@ -627,7 +742,9 @@ function renderNoteList() {
     const b = document.createElement('button');
     b.className = 'note-item' + (note.id === state.activeNoteId ? ' active' : '');
     const d = new Date(note.updatedAt || note.createdAt);
-    b.innerHTML = `<span class="ni-title"></span><span class="ni-meta"></span>`;
+    const cov = paperInfo(note.paper.color);
+    b.innerHTML = `<span class="ni-cover"></span><span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>`;
+    b.querySelector('.ni-cover').style.background = cov.bg;
     b.querySelector('.ni-title').textContent = note.title;
     b.querySelector('.ni-meta').textContent = `${note.pages.length} 页 · ${d.getMonth() + 1}/${d.getDate()}`;
     b.addEventListener('click', () => {
@@ -639,7 +756,7 @@ function renderNoteList() {
 }
 
 function createNote() {
-  const note = newNote(state.activeNotebookId || firstNotebookId(), '未命名笔记');
+  const note = newNote(state.activeNotebookId || firstNotebookId(), '未命名笔记', state.lib.settings.defaultPaper || { style: 'line', color: 'white' });
   state.lib.notes[note.id] = note;
   let nb = findNotebook(state.lib, note.notebookId);
   if (!nb) {
@@ -1025,12 +1142,14 @@ async function init() {
   state.widths.pen = lib.settings.penWidth || 5;
   state.widths.highlighter = lib.settings.hlWidth || 14;
 
-  engine.loupeEl = $('#loupe');
   bindUI();
   updateToolUI();
   updateColorUI();
   $('#optFinger').checked = !!lib.settings.fingerDraw;
-  $('#optLoupe').checked = !!lib.settings.loupe;
+  $('#optTwoFinger').checked = lib.settings.twoFingerUndo !== false;
+  $('#optAutoPage').checked = lib.settings.autoPage !== false;
+  renderSettings();
+  applyToolbarLayout();
 
   const active = lib.active || {};
   let note = active.noteId ? lib.notes[active.noteId] : null;
@@ -1064,6 +1183,10 @@ async function init() {
 }
 
 init();
+
+
+
+
 
 
 
