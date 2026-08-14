@@ -20,7 +20,9 @@ const state = {
   widths: { pen: 5, highlighter: 14, eraser: 24 },
   pageIndex: 0,
   activeNoteId: null, activeNotebookId: null, activeSubjectId: null,
-  collapsedSubjects: new Set()
+  collapsedSubjects: new Set(),
+  auth: null,
+  authAvailable: false
 };
 let history = [];
 let histIdx = -1;
@@ -112,7 +114,10 @@ function saveSoon(touch) {
   if (note && touch) note.updatedAt = Date.now();
   refreshTitleMeta();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { saveLibrary(state.lib); }, 350);
+  saveTimer = setTimeout(() => {
+    if (state.auth) api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) });
+    else saveLibrary(state.lib);
+  }, 350);
 }
 async function flushSave() {
   clearTimeout(saveTimer);
@@ -397,6 +402,28 @@ function bindUI() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
   // 触控板返回手势兼容
   window.addEventListener('popstate', () => {});
+  // 账户 / 登录
+  $('#btnUser').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#userMenu').classList.toggle('hidden');
+  });
+  $('#userMenu').addEventListener('click', (e) => {
+    const item = e.target.closest('[data-auth-action]');
+    if (!item) return;
+    $('#userMenu').classList.add('hidden');
+    if (item.dataset.authAction === 'login') openAuthModal('login');
+    if (item.dataset.authAction === 'logout') logout(true);
+  });
+  document.querySelectorAll('.auth-tab').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.auth-tab').forEach(x => x.classList.toggle('active', x === b));
+    $('#authSubmit').textContent = b.dataset.tab === 'login' ? '登录' : '注册并登录';
+    $('#authError').classList.add('hidden');
+  }));
+  const authEnter = (e) => { if (e.key === 'Enter') submitAuth(); };
+  $('#authUsername').addEventListener('keydown', authEnter);
+  $('#authPassword').addEventListener('keydown', authEnter);
+  $('#authSubmit').addEventListener('click', submitAuth);
+  $('#authModal').addEventListener('click', (e) => { if (e.target === $('#authModal')) closeAuthModal(); });
 }
 
 function updateToolUI() {
@@ -824,6 +851,131 @@ function aboutModal() {
   ]);
 }
 
+/* ---------------- 账户 / 认证 ---------------- */
+const AUTH_KEY = 'note2-auth';
+
+async function api(path, options = {}) {
+  try {
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if (state.auth && state.auth.token) headers.Authorization = 'Bearer ' + state.auth.token;
+    const res = await fetch(path, Object.assign({}, options, { headers }));
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (res.status === 401 && path !== '/api/login' && path !== '/api/register') {
+      state.auth = null;
+      try { localStorage.removeItem(AUTH_KEY); } catch (_) {}
+      updateAuthUI();
+    }
+    return Object.assign({ ok: res.ok, status: res.status }, data || {});
+  } catch (_) {
+    return { ok: false, status: 0, networkError: true };
+  }
+}
+
+function loadAuth() {
+  try { const raw = localStorage.getItem(AUTH_KEY); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+}
+function storeAuth(auth) {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(auth)); } catch (_) {}
+}
+
+function updateAuthUI() {
+  $('#btnUser').classList.toggle('hidden', !state.authAvailable);
+  const loggedIn = !!state.auth;
+  $('#userName').textContent = loggedIn ? state.auth.user.username : '未登录';
+  $('#userSub').textContent = loggedIn ? '已登录 · 笔记已同步' : '笔记仅保存在本机';
+  document.querySelector('[data-auth-action="login"]').classList.toggle('hidden', loggedIn);
+  document.querySelector('[data-auth-action="logout"]').classList.toggle('hidden', !loggedIn);
+}
+
+function openAuthModal(tab) {
+  $('#authError').classList.add('hidden');
+  document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  $('#authUsername').value = '';
+  $('#authPassword').value = '';
+  $('#authSubmit').textContent = tab === 'login' ? '登录' : '注册并登录';
+  $('#authModal').classList.remove('hidden');
+  setTimeout(() => $('#authUsername').focus(), 60);
+}
+function closeAuthModal() { $('#authModal').classList.add('hidden'); }
+
+async function submitAuth() {
+  const username = $('#authUsername').value.trim();
+  const password = $('#authPassword').value;
+  const tab = document.querySelector('.auth-tab.active').dataset.tab;
+  const errEl = $('#authError');
+  errEl.classList.add('hidden');
+  if (!username) { errEl.textContent = '请输入用户名'; errEl.classList.remove('hidden'); return; }
+  if (password.length < 6) { errEl.textContent = '密码至少 6 位'; errEl.classList.remove('hidden'); return; }
+  const res = await api('/api/' + tab, { method: 'POST', body: JSON.stringify({ username, password }) });
+  if (!res.ok) {
+    errEl.textContent = res.error || '网络错误，请检查服务器是否运行';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  state.auth = { token: res.token, user: res.user };
+  storeAuth(state.auth);
+  closeAuthModal();
+  await loadServerLibrary();
+  updateAuthUI();
+  toast('已登录：' + res.user.username);
+}
+
+async function loadServerLibrary() {
+  const r = await api('/api/library');
+  if (r.ok && r.library) {
+    state.lib = sanitize(r.library);
+  } else {
+    // 新账号：从欢迎笔记开始（本机笔记可通过「导出/导入 .notebook」迁移，避免账号间串数据）
+    state.lib = newLibrary();
+    firstRun = true;
+    await api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) });
+  }
+  state.lib = sanitize(state.lib);
+  applySettingsFromLib(state.lib);
+  bootstrapUI();
+}
+
+async function logout(showToastMsg) {
+  if (state.auth) api('/api/logout', { method: 'POST' });
+  state.auth = null;
+  try { localStorage.removeItem(AUTH_KEY); } catch (_) {}
+  const local = await loadLibrary();
+  state.lib = sanitize(local || newLibrary());
+  applySettingsFromLib(state.lib);
+  bootstrapUI();
+  updateAuthUI();
+  if (showToastMsg) toast('已退出登录');
+}
+
+function applySettingsFromLib(lib) {
+  if (!lib) return;
+  state.color = lib.settings.color || '#1e293b';
+  state.colors.pen = lib.settings.color || '#1e293b';
+  state.colors.highlighter = lib.settings.hlColor || '#fde047';
+  state.tool = lib.settings.tool || 'pen';
+  state.shape = lib.settings.shape || 'line';
+  if (state.colors[state.tool]) state.color = state.colors[state.tool];
+  state.widths.pen = lib.settings.penWidth || 5;
+  state.widths.highlighter = lib.settings.hlWidth || 14;
+}
+
+function bootstrapUI() {
+  const active = state.lib.active || {};
+  let note = active.noteId ? state.lib.notes[active.noteId] : null;
+  if (!note) {
+    for (const s of state.lib.subjects) for (const nb of s.notebooks) {
+      note = nb.noteIds.length ? state.lib.notes[nb.noteIds[0]] : null;
+      if (note) break;
+    }
+  }
+  if (note) openNote(note.id, active.notebookId, active.subjectId, active.pageIndex || 0);
+  else renderLibrary();
+  engine.setPage(currentPage());
+  engine.fitView();
+  engine.invalidateRaster();
+}
+
 /* ---------------- 初始化 ---------------- */
 function registerSW() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -883,5 +1035,10 @@ async function init() {
 }
 
 init();
+
+
+
+
+
 
 

@@ -102,6 +102,16 @@
           <button class="menu-item" data-action="about">关于「手记」</button>
         </div>
       </div>
+      <div class="tb-user-wrap">
+        <button id="btnUser" class="icon-btn" title="账户" aria-label="账户">
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-5 8-5s8 1.7 8 5"/></svg>
+        </button>
+        <div id="userMenu" class="menu hidden">
+          <div class="user-info"><span class="user-name" id="userName"></span><span class="user-sub" id="userSub">未登录</span></div>
+          <button class="menu-item" data-auth-action="login">登录 / 注册</button>
+          <button class="menu-item" data-auth-action="logout">退出登录</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -165,10 +175,26 @@
   <div id="toast" class="toast"></div>
   <input type="file" id="fileInput" accept=".note,.notebook,.json,application/json" hidden>
   <div id="modalRoot"></div>
+  <div id="authModal" class="modal-mask hidden">
+    <div class="modal auth-modal">
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">登录</button>
+        <button class="auth-tab" data-tab="register">注册新账号</button>
+      </div>
+      <div class="auth-body">
+        <div id="authError" class="auth-error hidden"></div>
+        <input type="text" id="authUsername" placeholder="用户名（2-20 位，可中文）" autocomplete="username" autocapitalize="none">
+        <input type="password" id="authPassword" placeholder="密码（至少 6 位）" autocomplete="current-password">
+        <button id="authSubmit" class="m-btn primary auth-submit">登录</button>
+        <p class="auth-tip">登录后笔记将按账号分别保存到服务器，可在多台设备间同步。</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
+
 
 
