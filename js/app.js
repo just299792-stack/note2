@@ -1,11 +1,12 @@
 ﻿/* =========================================================
    笔记 —— 主应用
    ========================================================= */
-import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize, findNote, findNotebook } from './storage.js';
+import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize, findNote, findNotebook,
+  saveAudioBlob, getAudioBlob, deleteAudioBlob, saveRecMeta, getRecMeta } from './storage.js';
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.1';
+const APP_VERSION = '4.2';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -23,7 +24,9 @@ const state = {
   activeNoteId: null, activeNotebookId: null, activeSubjectId: null,
   collapsedSubjects: new Set(),
   auth: null,
-  authAvailable: false
+  authAvailable: false,
+  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, playingId: null, audioEl: null },
+  recSupported: !!(navigator.mediaDevices && window.MediaRecorder)
 };
 let history = [];
 let histIdx = -1;
@@ -167,6 +170,8 @@ function openNote(noteId, notebookId, subjectId, pageIndex) {
   updateToolUI();
   updateColorUI();
   state.lib.active = { subjectId: state.activeSubjectId, notebookId: state.activeNotebookId, noteId, pageIndex: state.pageIndex };
+  stopPlayback();
+  if (!$('#recPanel').classList.contains('hidden')) refreshRecList();
   saveSoon();
 }
 
@@ -338,6 +343,16 @@ function bindUI() {
     renderSettings();
     $('#moreMenu').classList.toggle('hidden');
   });
+  // 录音
+  $('#btnRec').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const panel = $('#recPanel');
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) refreshRecList();
+  });
+  $('#recClose').addEventListener('click', () => { $('#recPanel').classList.add('hidden'); stopPlayback(); });
+  $('#recToggle').addEventListener('click', toggleRecording);
+  $('#btnRec').classList.toggle('hidden', !state.recSupported);
   $('#btnNewNote').addEventListener('click', createNote);
   $('#btnNewSubject').addEventListener('click', () => promptModal('新建科目', '', '科目名称', '创建', (name) => {
     if (!name) return;
@@ -1127,6 +1142,141 @@ function bootstrapUI() {
   engine.invalidateRaster();
 }
 
+/* ---------------- 录音 ---------------- */
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return m + ':' + ss;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function toggleRecording() {
+  if (state.rec.active) { stopRecording(); return; }
+  if (!state.recSupported) { toast('此设备不支持录音'); return; }
+  if (!currentNote()) { toast('请先打开一个笔记'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = window.MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    state.rec.chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) state.rec.chunks.push(e.data); };
+    rec.onstop = async () => {
+      const blob = new Blob(state.rec.chunks, { type: rec.mimeType || 'audio/mp4' });
+      state.rec.chunks = [];
+      state.rec.active = false;
+      clearInterval(state.rec.timer);
+      state.rec.media && state.rec.media.getTracks().forEach((t) => t.stop());
+      updateRecUI();
+      await saveRecording(blob);
+    };
+    state.rec.recorder = rec;
+    state.rec.media = stream;
+    state.rec.noteId = currentNote().id;
+    state.rec.startTime = Date.now();
+    rec.start();
+    state.rec.active = true;
+    state.rec.timer = setInterval(updateRecUI, 500);
+    updateRecUI();
+  } catch (e) {
+    console.warn('录音失败', e);
+    toast('无法录音：请使用 https 地址并允许麦克风权限');
+  }
+}
+
+function stopRecording() {
+  if (state.rec.recorder && state.rec.recorder.state !== 'inactive') state.rec.recorder.stop();
+}
+
+async function saveRecording(blob) {
+  const noteId = state.rec.noteId;
+  if (!noteId) return;
+  const list = await getRecMeta(noteId);
+  const recId = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const dur = Math.max(1, Math.round((Date.now() - state.rec.startTime) / 1000));
+  list.push({ id: recId, name: '录音 ' + (list.length + 1), duration: dur, createdAt: Date.now() });
+  await saveAudioBlob('audio:' + noteId + ':' + recId, blob);
+  await saveRecMeta(noteId, list);
+  refreshRecList();
+  toast('录音已保存');
+}
+
+function updateRecUI() {
+  const t = $('#recTimer');
+  const st = $('#recStatus');
+  const el = $('#recToggle');
+  if (state.rec.active) {
+    t.textContent = fmtTime(Math.floor((Date.now() - state.rec.startTime) / 1000));
+    st.textContent = '录音中…';
+    st.classList.add('live');
+    el.classList.add('recording');
+  } else {
+    t.textContent = '0:00';
+    st.textContent = '未在录音';
+    st.classList.remove('live');
+    el.classList.remove('recording');
+  }
+}
+
+function stopPlayback() {
+  if (state.rec.audioEl) {
+    try { state.rec.audioEl.pause(); } catch (_) {}
+    state.rec.audioEl = null;
+  }
+  state.rec.playingId = null;
+}
+
+async function refreshRecList() {
+  const note = currentNote();
+  const listEl = $('#recList');
+  if (!note) { listEl.innerHTML = ''; return; }
+  const list = await getRecMeta(note.id);
+  listEl.innerHTML = '';
+  if (!list.length) {
+    listEl.innerHTML = '<div class="rec-empty">还没有录音，点红色按钮开始</div>';
+    return;
+  }
+  for (const item of list) {
+    const row = document.createElement('div');
+    row.className = 'rec-item';
+    row.innerHTML = `
+      <button class="rec-play" data-rec="${escapeHtml(item.id)}"><svg viewBox="0 0 24 24" class="ic"><path d="M8 5v14l11-7z"/></svg></button>
+      <span class="rec-name">${escapeHtml(item.name)}</span>
+      <span class="rec-dur">${fmtTime(item.duration)}</span>
+      <button class="rec-del" data-del="${escapeHtml(item.id)}" aria-label="删除"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>`;
+    row.querySelector('.rec-play').addEventListener('click', () => playRecording(item));
+    row.querySelector('.rec-del').addEventListener('click', () => deleteRecording(item));
+    listEl.appendChild(row);
+  }
+}
+
+async function playRecording(item) {
+  const note = currentNote();
+  if (!note) return;
+  const blob = await getAudioBlob('audio:' + note.id + ':' + item.id);
+  if (!blob) { toast('音频文件不存在'); return; }
+  stopPlayback();
+  const url = URL.createObjectURL(blob);
+  const audio = document.createElement('audio');
+  audio.src = url;
+  audio.play().catch(() => {});
+  state.rec.audioEl = audio;
+  state.rec.playingId = item.id;
+  audio.onended = () => { try { URL.revokeObjectURL(url); } catch (_) {} state.rec.playingId = null; };
+}
+
+async function deleteRecording(item) {
+  const note = currentNote();
+  if (!note) return;
+  const list = await getRecMeta(note.id);
+  await saveRecMeta(note.id, list.filter((x) => x.id !== item.id));
+  await deleteAudioBlob('audio:' + note.id + ':' + item.id);
+  if (state.rec.playingId === item.id) stopPlayback();
+  refreshRecList();
+  toast('已删除录音');
+}
+
 /* ---------------- 初始化 ---------------- */
 function registerSW() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -1191,6 +1341,9 @@ async function init() {
 }
 
 init();
+
+
+
 
 
 

@@ -84,8 +84,9 @@ function demoStrokes() {
 
 /* ---------- IndexedDB ---------- */
 const DB_NAME = 'note2';
-const DB_VER = 1;
+const DB_VER = 2;
 const STORE = 'library';
+const AUDIO_STORE = 'audio';
 
 let _dbPromise = null;
 
@@ -96,6 +97,7 @@ function openDB() {
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -217,7 +219,50 @@ export function listNotes(lib, notebookId) {
   if (!f) return [];
   return f.notebook.noteIds.map(id => lib.notes[id]).filter(Boolean);
 }
-
-
-
+/* ---------- 录音存储（本地 IndexedDB，不进库 JSON） ---------- */
+export async function saveAudioBlob(key, blob) {
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+    tx.objectStore(AUDIO_STORE).put(blob, key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function getAudioBlob(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readonly');
+    const req = tx.objectStore(AUDIO_STORE).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+export async function deleteAudioBlob(key) {
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+    tx.objectStore(AUDIO_STORE).delete(key);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function saveRecMeta(noteId, list) {
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+    tx.objectStore(AUDIO_STORE).put(list, 'meta:' + noteId);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function getRecMeta(noteId) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readonly');
+    const req = tx.objectStore(AUDIO_STORE).get('meta:' + noteId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
 
