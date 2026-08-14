@@ -5,7 +5,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.0';
+const APP_VERSION = '4.1';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -326,10 +326,12 @@ function bindUI() {
   $('#btnLibrary').addEventListener('click', () => {
     if (window.matchMedia('(min-width: 821px)').matches) document.body.classList.toggle('no-library');
     else $('#library').classList.toggle('hidden-mobile');
+    engine.resize();
   });
   $('#btnPages').addEventListener('click', () => {
     if (window.matchMedia('(min-width: 821px)').matches) document.body.classList.toggle('no-pages');
     else $('#pagesPanel').classList.toggle('hidden-mobile');
+    engine.resize();
   });
   $('#btnMore').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -544,6 +546,7 @@ function applyToolbarLayout() {
   } else {
     if (tg.parentElement !== document.body) document.body.appendChild(tg);
   }
+  engine.refreshRect();
 }
 
 function renderSettings() {
@@ -1188,6 +1191,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 

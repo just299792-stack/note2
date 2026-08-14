@@ -213,6 +213,7 @@ export class DrawingEngine {
     c.addEventListener('wheel', this._wh, { passive: false });
     c.addEventListener('contextmenu', this._cx);
     window.addEventListener('resize', this._rs);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', this._rs);
     this.resize();
   }
 
@@ -225,6 +226,7 @@ export class DrawingEngine {
     c.removeEventListener('wheel', this._wh);
     c.removeEventListener('contextmenu', this._cx);
     window.removeEventListener('resize', this._rs);
+    if (window.visualViewport) window.visualViewport.removeEventListener('resize', this._rs);
   }
 
   /* -------- 视图 -------- */
@@ -256,7 +258,9 @@ export class DrawingEngine {
   }
 
   local(e) {
-    const r = this._rect || (this._rect = this.canvas.getBoundingClientRect());
+    // 每次实时读取画布位置，避免启动/布局变化后产生笔迹偏移
+    const r = this.canvas.getBoundingClientRect();
+    if (this._rect) { this._rect = r; }
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
   screenToWorld(sx, sy) { return { x: (sx - this.ox) / this.scale, y: (sy - this.oy) / this.scale }; }
@@ -751,10 +755,17 @@ export class DrawingEngine {
 
   invalidateRaster() { this.dirtyRaster = true; this.dirtyView = true; this.requestFrame(); }
 
+  refreshRect() {
+    this._rect = this.canvas.getBoundingClientRect();
+    this.dirtyView = true;
+    this.requestFrame();
+  }
+
   getSelectionIds() { return this.selection ? this.selection.ids : []; }
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
 
 
 
