@@ -28,7 +28,7 @@ export function newLibrary() {
     settings: {
       fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
-      toolbar: 'left', eraserSize: 24,
+      toolbar: 'left', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
       autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo',
       theme: 'auto'
@@ -147,7 +147,7 @@ export function sanitize(raw) {
   lib.settings = Object.assign({
     fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
     penWidth: 5, hlWidth: 14, hlColor: '#fde047',
-    toolbar: 'left', eraserSize: 24,
+    toolbar: 'left', eraserSize: 24, eraserMode: 'stroke',
     defaultPaper: { style: 'line', color: 'white' },
     autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo',
     theme: 'auto'
@@ -162,6 +162,7 @@ export function sanitize(raw) {
     delete lib.settings.loupe;
     if (!lib.settings.toolbar) lib.settings.toolbar = 'left';
     if (!lib.settings.eraserSize) lib.settings.eraserSize = 24;
+    if (!lib.settings.eraserMode) lib.settings.eraserMode = 'stroke';
     if (!lib.settings.defaultPaper) lib.settings.defaultPaper = { style: 'line', color: 'white' };
     if (lib.settings.autoPage === undefined) lib.settings.autoPage = true;
     if (lib.settings.twoFingerUndo === undefined) lib.settings.twoFingerUndo = true;
@@ -300,6 +301,7 @@ export async function deleteRecTimeline(noteId, recId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 
 
 

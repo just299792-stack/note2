@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.11';
+const APP_VERSION = '4.12';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -45,7 +45,8 @@ function settings() {
     tool: state.tool, color: state.color, shape: state.shape,
     width: state.widths[state.tool] || 5,
     fingerDraw: !!state.lib.settings.fingerDraw,
-    eraserSize: state.lib.settings.eraserSize || 24
+    eraserSize: state.lib.settings.eraserSize || 24,
+    eraserMode: state.lib.settings.eraserMode || 'stroke'
   };
 }
 
@@ -58,6 +59,12 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   onStrokeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '书写'); maybeAutoAdvance(st); },
   onShapeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '形状'); },
   onEraseDone: (ids) => { recCapture('erase', { ids }); mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除'); },
+  onPixelEraseDone: (path, radius) => {
+    const page = currentPage();
+    if (!page || !path || path.length < 2) return;
+    const newStrokes = pixelErase(page, path, radius);
+    if (newStrokes) mutate(() => { page.strokes = newStrokes; }, '擦除');
+  },
   onLassoMoveStart: () => { moveBefore = pageSnapshot(currentPage()); },
   onPageContentChanged: () => {
     const page = currentPage();
@@ -77,6 +84,54 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   }
 });
 let moveBefore = null;
+
+/* ---------------- 像素橡皮擦 ---------------- */
+function distToSeg(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (!l2) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+function pixelErase(page, path, radius) {
+  const segs = [];
+  for (let i = 0; i < path.length - 1; i++) segs.push([path[i], path[i + 1]]);
+  let changed = false;
+  const out = [];
+  for (const st of page.strokes) {
+    if (st.shape) {
+      const [a, b] = st.points;
+      if (!a || !b) { out.push(st); continue; }
+      const bx = Math.min(a.x, b.x) - 12, by = Math.min(a.y, b.y) - 12;
+      const bw = Math.abs(b.x - a.x) + 24, bh = Math.abs(b.y - a.y) + 24;
+      const hit = segs.some(([p, q]) =>
+        distToSeg(bx, by, p.x, p.y, q.x, q.y) <= radius ||
+        distToSeg(bx + bw, by, p.x, p.y, q.x, q.y) <= radius ||
+        distToSeg(bx, by + bh, p.x, p.y, q.x, q.y) <= radius ||
+        distToSeg(bx + bw, by + bh, p.x, p.y, q.x, q.y) <= radius
+      );
+      if (hit) { changed = true; continue; }
+      out.push(st);
+      continue;
+    }
+    const r = radius + (st.width || 4) / 2;
+    const keep = st.points.map(p => !segs.some(([a, b]) => distToSeg(p.x, p.y, a.x, a.y, b.x, b.y) <= r));
+    if (keep.every(Boolean)) { out.push(st); continue; }
+    changed = true;
+    let run = [];
+    const pushRun = () => {
+      if (run.length >= 2) out.push({ id: newId(), tool: st.tool, color: st.color, width: st.width, points: run });
+      run = [];
+    };
+    for (let i = 0; i < st.points.length; i++) {
+      if (keep[i]) run.push(st.points[i]);
+      else pushRun();
+    }
+    pushRun();
+  }
+  return changed ? out : null;
+}
 
 /* ---------------- 自动翻页（写到页尾时） ---------------- */
 function maybeAutoAdvance(st) {
@@ -646,6 +701,18 @@ function renderSettings() {
         renderSettings();
       });
       hlBox.appendChild(sw);
+    });
+  }
+  // 橡皮模式
+  const emEl = $('#eraserMode');
+  if (emEl) {
+    emEl.innerHTML = '';
+    [['stroke', '整笔'], ['pixel', '像素']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.eraserMode || 'stroke') === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.eraserMode = v; saveLibrary(state.lib); renderSettings(); });
+      emEl.appendChild(b);
     });
   }
   // 圆珠笔默认色
@@ -1891,6 +1958,7 @@ async function init() {
 }
 
 init();
+
 
 
 

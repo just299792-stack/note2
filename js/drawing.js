@@ -220,6 +220,7 @@ export class DrawingEngine {
     this.curShape = null;
     this.lassoPath = null;
     this.eraseIds = new Set();
+    this.erasePath = null;
     this.selection = null;
     this.playbackLock = false;
     this._raf = 0;
@@ -332,8 +333,10 @@ export class DrawingEngine {
         break;
       case 'eraser':
         this.eraseIds = new Set();
+        this.erasePath = [];
         this.lastErase = { x: w.x, y: w.y };
-        this.hitErase(w.x, w.y);
+        this.erasePath.push({ x: w.x, y: w.y });
+        if (settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
         break;
       case 'lasso':
         if (this.selection && this.selection.ids.length && this.pointInBox(w, this.selection.box)) {
@@ -385,8 +388,11 @@ export class DrawingEngine {
         this.dirtyView = true;
       }
     } else if (settings.tool === 'eraser') {
-      this.hitErase(w.x, w.y);
+      if (this.erasePath && Math.hypot(w.x - this.lastErase.x, w.y - this.lastErase.y) >= 6) {
+        this.erasePath.push({ x: w.x, y: w.y });
+      }
       this.lastErase = { x: w.x, y: w.y };
+      if (settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
       this.dirtyView = true;
     } else if (settings.tool === 'lasso') {
       if (this.lassoPath) {
@@ -433,7 +439,11 @@ export class DrawingEngine {
       if (st.points.length >= 2) this.cb.onStrokeDone(st);
       else this.dirtyView = true;
     } else if (settings.tool === 'eraser') {
-      if (this.eraseIds.size) {
+      if (settings.eraserMode === 'pixel') {
+        const path = this.erasePath || [];
+        this.erasePath = null;
+        this.cb.onPixelEraseDone(path, settings.eraserSize || 24);
+      } else if (this.eraseIds.size) {
         const ids = [...this.eraseIds];
         this.eraseIds = new Set();
         this.cb.onEraseDone(ids);
@@ -780,7 +790,7 @@ export class DrawingEngine {
   setPage(page) {
     this.page = page;
     this.selection = null; this.currentStroke = null; this.lassoPath = null; this.curShape = null;
-    this.eraseIds = new Set(); this.textTap = null;
+    this.eraseIds = new Set(); this.textTap = null; this.erasePath = null;
     this.dirtyRaster = true; this.dirtyView = true;
     this.requestFrame();
   }
@@ -797,6 +807,7 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
 
 
 
