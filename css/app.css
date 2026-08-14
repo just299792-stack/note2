@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   手记 Note 2 —— 样式表
+   笔记 Note 2 —— 样式表
    ========================================================= */
 :root {
   --bg: #f3f4f6;
@@ -369,3 +369,4 @@ body.no-pages .pages-panel { display: none; }
 .menu, .pop { border-radius: 16px; }
 .page-thumb { border-radius: 10px; }
 .paper-holder { background: radial-gradient(1200px 600px at 50% 0%, rgba(255,255,255,.25), transparent 60%); }
+

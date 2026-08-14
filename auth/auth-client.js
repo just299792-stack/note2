@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   手记账号系统 —— 可复用前端组件（零依赖，单文件）
+   笔记账号系统 —— 可复用前端组件（零依赖，单文件）
    任何网页引入即可：
      <script src="auth/auth-client.js"></script>
      <script>
@@ -188,3 +188,4 @@
     onAuthChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); }
   };
 })(window);
+

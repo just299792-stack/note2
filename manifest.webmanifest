@@ -1,6 +1,6 @@
 ﻿{
-  "name": "手记 · 精美手写笔记",
-  "short_name": "手记",
+  "name": "笔记 · 精美手写笔记",
+  "short_name": "笔记",
   "description": "Notability 风格的手写笔记应用，支持 Apple Pencil、页面管理、PDF/笔记文件导出与转移。",
   "start_url": "./index.html",
   "scope": "./",
@@ -15,4 +15,5 @@
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
+
 

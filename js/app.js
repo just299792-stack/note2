@@ -1,10 +1,11 @@
 ﻿/* =========================================================
-   手记 —— 主应用
+   笔记 —— 主应用
    ========================================================= */
 import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize, findNote, findNotebook } from './storage.js';
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
+const APP_VERSION = '3.2';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -743,7 +744,7 @@ async function exportPdf() {
 async function exportLibrary() {
   const data = { format: 'note2', version: 1, type: 'library', exportedAt: new Date().toISOString(), library: state.lib };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  await shareOrDownload(blob, '手记资料库.notebook');
+  await shareOrDownload(blob, '笔记资料库.notebook');
 }
 
 async function handleImport(file) {
@@ -856,9 +857,9 @@ function confirmModal(title, desc, confirmText, danger, onConfirm) {
 }
 
 function aboutModal() {
-  modalShell('关于「手记」', `
+  modalShell('关于「笔记」', `
     <div class="m-desc" style="line-height:1.8">
-      <b>手记</b> 是一款 Notability 风格的手写笔记应用。<br>
+      <b>笔记</b> 是一款 Notability 风格的手写笔记应用。<br>
       · Apple Pencil 压力感应书写<br>
       · 荧光笔、橡皮擦、套索、文字、形状<br>
       · 双指缩放平移 · 放大镜<br>
@@ -1048,7 +1049,7 @@ async function init() {
 
   if (firstRun) {
     setTimeout(() => {
-      toast('欢迎使用「手记」！用 Apple Pencil 或鼠标书写 ✍️');
+      toast('欢迎使用「笔记」！用 Apple Pencil 或鼠标书写 ✍️');
     }, 600);
   }
   // 记录首启
@@ -1060,6 +1061,9 @@ async function init() {
 }
 
 init();
+
+
+
 
 
 

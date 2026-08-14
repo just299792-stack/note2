@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   手记 —— 静态服务器 + 认证 API（HTTP 8080 / HTTPS 8443）
+   笔记 —— 静态服务器 + 认证 API（HTTP 8080 / HTTPS 8443）
    认证功能来自 auth/server-auth 模块。
    HTTPS 用于 iPad 离线 PWA：https://<局域网IP>:8443
    ========================================================= */
@@ -60,16 +60,17 @@ const handler = async (req, res) => {
   serveStatic(req, res, url);
 };
 
-http.createServer(handler).listen(HTTP_PORT, () => console.log(`手记 HTTP  运行于 http://localhost:${HTTP_PORT}`));
+http.createServer(handler).listen(HTTP_PORT, () => console.log(`笔记 HTTP  运行于 http://localhost:${HTTP_PORT}`));
 
 // 若存在证书则同时启用 HTTPS（供 iPad 离线 PWA）
 try {
   const key = fs.readFileSync(path.join(ROOT, 'certs', 'server.key'));
   const cert = fs.readFileSync(path.join(ROOT, 'certs', 'server.crt'));
   https.createServer({ key, cert }, handler).listen(HTTPS_PORT, () => {
-    console.log(`手记 HTTPS 运行于 https://localhost:${HTTPS_PORT}（iPad 离线用，证书可下载 /cert.cer）`);
+    console.log(`笔记 HTTPS 运行于 https://localhost:${HTTPS_PORT}（iPad 离线用，证书可下载 /cert.cer）`);
   });
 } catch (e) {
   console.log('未找到 certs/server.key 与 server.crt，HTTPS 未启用（仅离线 PWA 需要）');
 }
+
 

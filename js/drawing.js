@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   手记 —— 绘图引擎
+   笔记 —— 绘图引擎
    - 矢量笔画（归一化坐标，分辨率无关）
    - 钢笔压力感应 / 荧光笔 / 橡皮擦 / 套索 / 文字 / 形状
    - 双指平移缩放、放大镜、页面光栅复用
@@ -802,6 +802,7 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
 
 
 

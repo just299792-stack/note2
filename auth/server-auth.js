@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   手记账号系统 —— 可复用后端认证模块（零依赖）
+   笔记账号系统 —— 可复用后端认证模块（零依赖）
    任何 Node 静态服务器都可挂载：
      const { createAuth } = require('./auth/server-auth');
      const auth = createAuth({ dataDir: __dirname + '/data' });
@@ -179,3 +179,4 @@ function createAuth(options = {}) {
 }
 
 module.exports = { createAuth };
+

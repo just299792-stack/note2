@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   手记 —— 数据模型 + 存储层 (IndexedDB)
+   笔记 —— 数据模型 + 存储层 (IndexedDB)
    ========================================================= */
 import { PAGE_W, PAGE_H } from './drawing.js';
 
@@ -15,12 +15,12 @@ export function newId() {
 export function newLibrary() {
   const subjId = newId();
   const nbId = newId();
-  const note = newNote(nbId, '欢迎使用手记 ✍️');
+  const note = newNote(nbId, '欢迎使用笔记 ✍️');
   note.paper = { style: 'line', color: 'white' };
   const p = note.pages[0];
   p.strokes = demoStrokes();
   p.texts = [
-    { id: newId(), x: 0.10, y: 0.08, w: 0.62, h: 0.09, text: '欢迎使用「手记」', fontSize: 42, color: '#1e293b', align: 'left' },
+    { id: newId(), x: 0.10, y: 0.08, w: 0.62, h: 0.09, text: '欢迎使用「笔记」', fontSize: 42, color: '#1e293b', align: 'left' },
     { id: newId(), x: 0.10, y: 0.16, w: 0.8, h: 0.07, text: '像 Notability 一样书写、整理、导出你的笔记。', fontSize: 24, color: '#64748b', align: 'left' }
   ];
   return {
@@ -198,5 +198,6 @@ export function listNotes(lib, notebookId) {
   if (!f) return [];
   return f.notebook.noteIds.map(id => lib.notes[id]).filter(Boolean);
 }
+
 
 
