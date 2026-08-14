@@ -37,12 +37,13 @@ ode server.js），
 > 「更多 → 导出本笔记 / 导出 PDF / 导出整个资料库」转移或备份。
 > 电脑不要关机、不要关服务器窗口即可一直使用。
 
-### GitHub Pages（可选）
+### GitHub Pages（已上线）
 
-源码已托管到 https://github.com/just299792-stack/note2 并内置了
-.github/workflows/pages.yml 自动部署。若要在线上访问：
-仓库 **Settings → Pages → Source 选择 GitHub Actions** 后，
-推送会自动上线（国内网络访问 github.io 通常需要代理/VPN）。
+公网地址：**https://just299792-stack.github.io/note2/**
+
+源码托管于 https://github.com/just299792-stack/note2 ，仓库启用
+「Deploy from a branch (main /)」，推送 main 即自动更新。
+> 注意：国内网络访问 github.io 通常需要代理/VPN。
 
 ### 本地启动（开发 / 桌面试用）
 
@@ -92,5 +93,6 @@ server.js             零依赖本地服务器
 - 页面渲染到超采样离屏光栅，再按视图变换合成，书写流畅。
 - PDF 由页面画布经 JPEG 内嵌生成，页面比例与逻辑页一致（Letter 比例）。
 - 全部为原生 Web 技术，无任何第三方依赖，可离线运行。
+
 
 
