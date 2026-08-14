@@ -17,7 +17,7 @@ export function newLibrary() {
   return {
     version: LIB_VERSION,
     settings: {
-      fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
+      fingerDraw: false, tool: 'ballpen', color: '#1e293b', width: 5, shape: 'line',
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
@@ -124,7 +124,7 @@ export function sanitize(raw) {
   const fromVersion = Number(lib.version) || 1;
   lib.version = LIB_VERSION;
   lib.settings = Object.assign({
-    fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
+    fingerDraw: false, tool: 'ballpen', color: '#1e293b', width: 5, shape: 'line',
     penWidth: 5, hlWidth: 14, hlColor: '#fde047',
     toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
     defaultPaper: { style: 'line', color: 'white' },

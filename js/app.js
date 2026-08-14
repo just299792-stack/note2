@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.26';
+const APP_VERSION = '4.27';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -19,7 +19,7 @@ const PAPER_COLORS = ['white', 'cream', 'grey', 'black', 'blue', 'green'];
 
 const state = {
   lib: null,
-  tool: 'pen', color: '#1e293b', shape: 'line',
+  tool: 'ballpen', color: '#1e293b', shape: 'line',
   colors: { pen: '#1e293b', highlighter: '#fde047', ballpen: '#1e293b' },
   widths: { pen: 5, highlighter: 14, eraser: 24, ballpen: 5 },
   styles: { pen: 'normal', ballpen: 'normal' },
@@ -2438,7 +2438,7 @@ function applySettingsFromLib(lib) {
   state.colors.pen = lib.settings.color || '#1e293b';
   state.colors.highlighter = lib.settings.hlColor || '#fde047';
   state.colors.ballpen = lib.settings.ballpenColor || '#1e293b';
-  state.tool = lib.settings.tool || 'pen';
+  state.tool = lib.settings.tool || 'ballpen';
   state.shape = lib.settings.shape || 'line';
   if (state.colors[state.tool]) state.color = state.colors[state.tool];
   state.widths.pen = lib.settings.penWidth || 5;
@@ -2687,7 +2687,7 @@ async function deleteRecording(item) {
 function resetSettings() {
   confirmModal('恢复默认设置？', '将重置工具、纸张、手势等全部设置（笔记内容不受影响）。', '恢复', true, () => {
     state.lib.settings = {
-      fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
+      fingerDraw: false, tool: 'ballpen', color: '#1e293b', width: 5, shape: 'line',
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
