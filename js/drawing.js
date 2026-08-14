@@ -192,6 +192,7 @@ export class DrawingEngine {
     this.lassoPath = null;
     this.eraseIds = new Set();
     this.selection = null;
+    this.playbackLock = false;
     this._raf = 0;
     this._rect = null;
 
@@ -278,6 +279,7 @@ export class DrawingEngine {
 
   onPointerDown(e) {
     if (this.pointers.size >= 2) return;
+    if (this.playbackLock) return;
     try { this.canvas.setPointerCapture?.(e.pointerId); } catch (_) {}
     const L = this.local(e);
     this.pointers.set(e.pointerId, { id: e.pointerId, x: L.x, y: L.y });
@@ -765,6 +767,7 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
 
 
 

@@ -265,4 +265,32 @@ export async function getRecMeta(noteId) {
     req.onerror = () => reject(req.error);
   });
 }
+export async function saveRecTimeline(noteId, recId, timeline) {
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+    tx.objectStore(AUDIO_STORE).put(timeline, 'timeline:' + noteId + ':' + recId);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+export async function getRecTimeline(noteId, recId) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readonly');
+    const req = tx.objectStore(AUDIO_STORE).get('timeline:' + noteId + ':' + recId);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+export async function deleteRecTimeline(noteId, recId) {
+  const db = await openDB();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+    tx.objectStore(AUDIO_STORE).delete('timeline:' + noteId + ':' + recId);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 

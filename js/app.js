@@ -2,11 +2,12 @@
    笔记 —— 主应用
    ========================================================= */
 import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize, findNote, findNotebook,
-  saveAudioBlob, getAudioBlob, deleteAudioBlob, saveRecMeta, getRecMeta } from './storage.js';
+  saveAudioBlob, getAudioBlob, deleteAudioBlob, saveRecMeta, getRecMeta,
+  saveRecTimeline, getRecTimeline, deleteRecTimeline } from './storage.js';
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.2';
+const APP_VERSION = '4.3';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -25,7 +26,7 @@ const state = {
   collapsedSubjects: new Set(),
   auth: null,
   authAvailable: false,
-  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, playingId: null, audioEl: null },
+  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [] },
   recSupported: !!(navigator.mediaDevices && window.MediaRecorder)
 };
 let history = [];
@@ -51,9 +52,9 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
   getSettings: settings,
   getFont: () => FONT,
-  onStrokeDone: (st) => { mutate(() => currentPage().strokes.push(st), '书写'); maybeAutoAdvance(st); },
-  onShapeDone: (st) => mutate(() => currentPage().strokes.push(st), '形状'),
-  onEraseDone: (ids) => mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除'),
+  onStrokeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '书写'); maybeAutoAdvance(st); },
+  onShapeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '形状'); },
+  onEraseDone: (ids) => { recCapture('erase', { ids }); mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除'); },
   onLassoMoveStart: () => { moveBefore = pageSnapshot(currentPage()); },
   onPageContentChanged: () => {
     const page = currentPage();
@@ -1152,7 +1153,20 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function recCapture(type, data) {
+  const r = state.rec;
+  if (!r.active || !r.noteId || !r.pageId) return;
+  const page = currentPage();
+  if (!page || page.id !== r.pageId) return;
+  r.timeline.push({
+    t: Date.now() - r.startTime,
+    type,
+    data: type === 'stroke' ? JSON.parse(JSON.stringify(data)) : data
+  });
+}
+
 async function toggleRecording() {
+  if (state.rec.playback) stopPlayback();
   if (state.rec.active) { stopRecording(); return; }
   if (!state.recSupported) { toast('此设备不支持录音'); return; }
   if (!currentNote()) { toast('请先打开一个笔记'); return; }
@@ -1174,6 +1188,9 @@ async function toggleRecording() {
     state.rec.recorder = rec;
     state.rec.media = stream;
     state.rec.noteId = currentNote().id;
+    state.rec.pageId = currentPage() ? currentPage().id : null;
+    state.rec.baseCount = currentPage() ? currentPage().strokes.length : 0;
+    state.rec.timeline = [];
     state.rec.startTime = Date.now();
     rec.start();
     state.rec.active = true;
@@ -1197,6 +1214,8 @@ async function saveRecording(blob) {
   const dur = Math.max(1, Math.round((Date.now() - state.rec.startTime) / 1000));
   list.push({ id: recId, name: '录音 ' + (list.length + 1), duration: dur, createdAt: Date.now() });
   await saveAudioBlob('audio:' + noteId + ':' + recId, blob);
+  await saveRecTimeline(noteId, recId, state.rec.timeline || []);
+  state.rec.timeline = [];
   await saveRecMeta(noteId, list);
   refreshRecList();
   toast('录音已保存');
@@ -1220,11 +1239,21 @@ function updateRecUI() {
 }
 
 function stopPlayback() {
+  state.rec.playbackTimers.forEach(clearTimeout);
+  state.rec.playbackTimers = [];
   if (state.rec.audioEl) {
     try { state.rec.audioEl.pause(); } catch (_) {}
     state.rec.audioEl = null;
   }
+  if (state.rec.playback) {
+    state.rec.playback = false;
+    engine.playbackLock = false;
+    const real = currentPage();
+    if (real) { engine.setPage(real); engine.invalidateRaster(); }
+  }
   state.rec.playingId = null;
+  const st = $('#recStatus');
+  if (st) { st.textContent = '未在录音'; st.classList.remove('live'); }
 }
 
 async function refreshRecList() {
@@ -1254,16 +1283,46 @@ async function refreshRecList() {
 async function playRecording(item) {
   const note = currentNote();
   if (!note) return;
+  if (state.rec.active) { toast('请先停止录音'); return; }
   const blob = await getAudioBlob('audio:' + note.id + ':' + item.id);
   if (!blob) { toast('音频文件不存在'); return; }
   stopPlayback();
+  const timeline = await getRecTimeline(note.id, item.id);
+  const page = currentPage();
+  // 笔迹回放：克隆当前页，去掉时间线里会被重放的笔画，按时间逐笔重现
+  if (timeline.length && page) {
+    const tlIds = new Set(timeline.filter(e => e.type === 'stroke').map(e => e.data && e.data.id).filter(Boolean));
+    const clone = {
+      id: page.id,
+      strokes: page.strokes.filter(s => !tlIds.has(s.id)).map(s => JSON.parse(JSON.stringify(s))),
+      texts: JSON.parse(JSON.stringify(page.texts))
+    };
+    state.rec.playback = true;
+    engine.playbackLock = true;
+    engine.setPage(clone);
+    engine.invalidateRaster();
+    const maxT = Math.max(0, ...timeline.map(e => e.t));
+    for (const ev of timeline) {
+      state.rec.playbackTimers.push(setTimeout(() => {
+        if (!state.rec.playback || !engine.page) return;
+        const c = engine.page;
+        if (ev.type === 'stroke') {
+          if (!c.strokes.some(s => s.id === ev.data.id)) c.strokes.push(JSON.parse(JSON.stringify(ev.data)));
+        } else if (ev.type === 'erase') {
+          c.strokes = c.strokes.filter(s => !ev.data.ids.includes(s.id));
+        }
+        engine.invalidateRaster();
+      }, ev.t));
+    }
+    state.rec.playbackTimers.push(setTimeout(() => { if (state.rec.playback) stopPlayback(); }, maxT + 1500));
+  }
   const url = URL.createObjectURL(blob);
   const audio = document.createElement('audio');
   audio.src = url;
   audio.play().catch(() => {});
   state.rec.audioEl = audio;
   state.rec.playingId = item.id;
-  audio.onended = () => { try { URL.revokeObjectURL(url); } catch (_) {} state.rec.playingId = null; };
+  audio.onended = () => { try { URL.revokeObjectURL(url); } catch (_) {} if (state.rec.playback) stopPlayback(); };
 }
 
 async function deleteRecording(item) {
@@ -1272,6 +1331,7 @@ async function deleteRecording(item) {
   const list = await getRecMeta(note.id);
   await saveRecMeta(note.id, list.filter((x) => x.id !== item.id));
   await deleteAudioBlob('audio:' + note.id + ':' + item.id);
+  await deleteRecTimeline(note.id, item.id);
   if (state.rec.playingId === item.id) stopPlayback();
   refreshRecList();
   toast('已删除录音');
@@ -1335,12 +1395,16 @@ async function init() {
   // 记录首启
   try { if (!localStorage.getItem('note2-seen')) { localStorage.setItem('note2-seen', '1'); } } catch (_) {}
   // 调试句柄（供测试/排查使用）
-  window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, switchPage, setPaper, exportNote, exportPdf, handleImport };
+  window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
+    rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList } };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
 
 init();
+
+
+
 
 
 
