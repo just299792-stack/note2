@@ -10,7 +10,7 @@ const RENDER_SCALE = 2;         // 页面光栅超采样
 const MIN_DIST = 1.1;           // 点抽稀最小距离(世界px)
 
 const PAPER_INFO = {
-  white:  { bg: '#ffffff',  line: 'rgba(120,160,220,.35)',  grid: 'rgba(120,160,220,.30)',  dot: 'rgba(120,160,220,.45)',  dark: false, name: '白色' },
+  white:  { bg: '#fffefb',  line: 'rgba(120,160,220,.35)',  grid: 'rgba(120,160,220,.30)',  dot: 'rgba(120,160,220,.45)',  dark: false, name: '白色' },
   cream:  { bg: '#fffcf2',  line: 'rgba(190,160,120,.38)',  grid: 'rgba(190,160,120,.32)',  dot: 'rgba(190,160,120,.45)',  dark: false, name: '米黄' },
   grey:   { bg: '#f3f5f7',  line: 'rgba(110,130,160,.35)',  grid: 'rgba(110,130,160,.30)',  dot: 'rgba(110,130,160,.45)',  dark: false, name: '浅灰' },
   black:  { bg: '#111827',  line: 'rgba(255,255,255,.14)',  grid: 'rgba(255,255,255,.12)',  dot: 'rgba(255,255,255,.22)',  dark: true,  name: '黑' },
@@ -30,6 +30,9 @@ export function drawPaper(ctx, style, color, w, h) {
     ctx.beginPath();
     for (let y = LINE; y < h; y += LINE) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
     ctx.stroke();
+    // 左侧页边距线（更接近真实笔记本）
+    ctx.strokeStyle = info.line; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(92, 0); ctx.lineTo(92, h); ctx.stroke();
   } else if (style === 'grid') {
     ctx.strokeStyle = info.grid; ctx.lineWidth = 1;
     ctx.beginPath();
@@ -99,13 +102,24 @@ export function drawStroke(ctx, st, info, font) {
     ctx.restore();
     return;
   }
-  ctx.fillStyle = st.color;
+  // 钢笔：平滑路径 + 圆头圆角（流畅实线，不呈点线）
   const pts = st.points;
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const r = Math.max(0.4, (st.width / 2) * (p.p || 1));
-    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
+  let sumP = 0;
+  for (let i = 0; i < pts.length; i++) sumP += pts[i].p || 1;
+  const avgP = Math.max(0.3, Math.min(1, sumP / pts.length));
+  ctx.strokeStyle = st.color;
+  ctx.lineWidth = Math.max(1.4, st.width * (0.45 + 0.55 * avgP));
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2;
+    const my = (pts[i].y + pts[i + 1].y) / 2;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
   }
+  ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -752,6 +766,9 @@ export class DrawingEngine {
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
   clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
 }
+
+
+
 
 
 

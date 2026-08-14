@@ -31,7 +31,7 @@ function sendJson(res, status, obj) {
 function serveStatic(req, res, url) {
   let p = decodeURIComponent(url.pathname);
   if (p === '/') p = '/index.html';
-  if (p === '/cert.cer') p = '/certs/server.cer';
+  if (p === '/cert.cer') p = '/certs/ca.cer';
   const file = path.join(ROOT, path.normalize(p));
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {
@@ -72,3 +72,4 @@ try {
 } catch (e) {
   console.log('未找到 certs/server.key 与 server.crt，HTTPS 未启用（仅离线 PWA 需要）');
 }
+

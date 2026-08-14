@@ -87,6 +87,9 @@ function mutate(fn, label) {
   const after = pageSnapshot(page);
   if (before === after) return;
   pushHistory(label, () => restoreContent(page, before), () => restoreContent(page, after));
+  // 重绘页面与缩略图，确保笔迹立即显示
+  engine.invalidateRaster();
+  refreshThumbs();
   saveSoon(true);
 }
 function undo() {
@@ -1039,6 +1042,7 @@ async function init() {
 }
 
 init();
+
 
 
 
