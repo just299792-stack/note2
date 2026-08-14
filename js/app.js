@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.16';
+const APP_VERSION = '4.17';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -538,6 +538,7 @@ function bindUI() {
     if (act === 'delete-page') deletePage();
     if (act === 'account') { if (state.auth) logout(true); else openAuthModal('login'); }
     if (act === 'logout') logout(true);
+    if (act === 'reset-settings') resetSettings();
     if (act === 'about') aboutModal();
   });
   $('#optFinger').addEventListener('change', (e) => { state.lib.settings.fingerDraw = e.target.checked; saveLibrary(state.lib); });
@@ -2027,6 +2028,30 @@ async function deleteRecording(item) {
   toast('已删除录音');
 }
 
+/* ---------------- 恢复默认设置 ---------------- */
+function resetSettings() {
+  confirmModal('恢复默认设置？', '将重置工具、纸张、手势等全部设置（笔记内容不受影响）。', '恢复', true, () => {
+    state.lib.settings = {
+      fingerDraw: false, tool: 'pen', color: '#1e293b', width: 5, shape: 'line',
+      penWidth: 5, hlWidth: 14, hlColor: '#fde047',
+      toolbar: 'left', eraserSize: 24, eraserMode: 'stroke',
+      defaultPaper: { style: 'line', color: 'white' },
+      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', theme: 'auto', textSize: 26
+    };
+    applySettingsFromLib(state.lib);
+    applyToolbarLayout();
+    applyTheme();
+    updateToolUI();
+    updateColorUI();
+    const of = $('#optFinger'); if (of) of.checked = false;
+    const o2 = $('#optTwoFinger'); if (o2) o2.checked = true;
+    const oa = $('#optAutoPage'); if (oa) oa.checked = true;
+    saveLibrary(state.lib);
+    renderSettings();
+    toast('已恢复默认设置');
+  });
+}
+
 /* ---------------- 初始化 ---------------- */
 function registerSW() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -2096,6 +2121,7 @@ async function init() {
 }
 
 init();
+
 
 
 

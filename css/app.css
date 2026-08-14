@@ -738,3 +738,9 @@ body.theme-light .topbar {
 /* 笔记排序条 */
 .note-sort { margin: 0 10px 8px; }
 .note-sort button { padding: 5px 4px; font-size: 11.5px; }
+
+/* ============ 触摸体验优化 ============ */
+body { -webkit-touch-callout: none; }
+button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .rec-btn, .auth-tab, .paper-style, .paper-color, .swatch {
+  touch-action: manipulation;
+}
