@@ -1,13 +1,17 @@
 ﻿/* =========================================================
-   手记 —— 静态服务器（认证功能来自 auth/server-auth 模块）
-   任何项目接入：把本项目当作模板，或复制 auth/ 并参考此文件。
+   手记 —— 静态服务器 + 认证 API（HTTP 8080 / HTTPS 8443）
+   认证功能来自 auth/server-auth 模块。
+   HTTPS 用于 iPad 离线 PWA：https://<局域网IP>:8443
    ========================================================= */
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { createAuth } = require('./auth/server-auth');
 
 const ROOT = __dirname;
+const HTTP_PORT = 8080;
+const HTTPS_PORT = 8443;
 const auth = createAuth({ dataDir: path.join(ROOT, 'data') });
 
 const MIME = {
@@ -15,7 +19,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json',
   '.webmanifest': 'application/manifest+json', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8', '.note': 'application/json',
-  '.notebook': 'application/json'
+  '.notebook': 'application/json', '.cer': 'application/x-x509-ca-cert'
 };
 
 function sendJson(res, status, obj) {
@@ -27,6 +31,7 @@ function sendJson(res, status, obj) {
 function serveStatic(req, res, url) {
   let p = decodeURIComponent(url.pathname);
   if (p === '/') p = '/index.html';
+  if (p === '/cert.cer') p = '/certs/server.cer';
   const file = path.join(ROOT, path.normalize(p));
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (err, data) => {
@@ -39,7 +44,7 @@ function serveStatic(req, res, url) {
   });
 }
 
-http.createServer(async (req, res) => {
+const handler = async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch { res.writeHead(400); res.end(); return; }
   if (url.pathname.startsWith('/api/')) {
@@ -53,4 +58,17 @@ http.createServer(async (req, res) => {
     return;
   }
   serveStatic(req, res, url);
-}).listen(8080, () => console.log('手记运行于 http://localhost:8080（含账号系统）'));
+};
+
+http.createServer(handler).listen(HTTP_PORT, () => console.log(`手记 HTTP  运行于 http://localhost:${HTTP_PORT}`));
+
+// 若存在证书则同时启用 HTTPS（供 iPad 离线 PWA）
+try {
+  const key = fs.readFileSync(path.join(ROOT, 'certs', 'server.key'));
+  const cert = fs.readFileSync(path.join(ROOT, 'certs', 'server.crt'));
+  https.createServer({ key, cert }, handler).listen(HTTPS_PORT, () => {
+    console.log(`手记 HTTPS 运行于 https://localhost:${HTTPS_PORT}（iPad 离线用，证书可下载 /cert.cer）`);
+  });
+} catch (e) {
+  console.log('未找到 certs/server.key 与 server.crt，HTTPS 未启用（仅离线 PWA 需要）');
+}

@@ -855,10 +855,12 @@ function aboutModal() {
 const AUTH_KEY = 'note2-auth';
 
 async function api(path, options = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
   try {
     const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
     if (state.auth && state.auth.token) headers.Authorization = 'Bearer ' + state.auth.token;
-    const res = await fetch(path, Object.assign({}, options, { headers }));
+    const res = await fetch(path, Object.assign({}, options, { headers, signal: ctrl.signal }));
     let data = null;
     try { data = await res.json(); } catch (_) {}
     if (res.status === 401 && path !== '/api/login' && path !== '/api/register') {
@@ -866,8 +868,10 @@ async function api(path, options = {}) {
       try { localStorage.removeItem(AUTH_KEY); } catch (_) {}
       updateAuthUI();
     }
+    clearTimeout(timer);
     return Object.assign({ ok: res.ok, status: res.status }, data || {});
   } catch (_) {
+    clearTimeout(timer);
     return { ok: false, status: 0, networkError: true };
   }
 }
@@ -1035,6 +1039,7 @@ async function init() {
 }
 
 init();
+
 
 
 
