@@ -744,3 +744,9 @@ body { -webkit-touch-callout: none; }
 button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .rec-btn, .auth-tab, .paper-style, .paper-color, .swatch {
   touch-action: manipulation;
 }
+
+/* 笔记分组标题 */
+.note-group-head {
+  font-size: 11px; color: var(--text-3); font-weight: 700;
+  letter-spacing: .08em; padding: 10px 10px 2px;
+}

@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.18';
+const APP_VERSION = '4.19';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1019,6 +1019,16 @@ function updateEmptyState() {
   if (el) el.classList.toggle('hidden', !!currentNote());
 }
 
+function dateLabel(ts) {
+  const d = new Date(ts || 0); const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = 86400000;
+  if (ts >= startToday) return '今天';
+  if (ts >= startToday - day) return '昨天';
+  if (ts >= startToday - 7 * day) return '本周';
+  return '更早';
+}
+
 function renderNoteSortUI() {
   const seg = $('#noteSort');
   if (!seg) return;
@@ -1065,7 +1075,26 @@ function renderNoteList() {
     root.appendChild(empty);
     return;
   }
-  for (const note of notes) {
+  const groups = [];
+  if (sortBy === 'updated') {
+    let lastLabel = null;
+    for (const n of notes) {
+      const label = dateLabel(n.updatedAt);
+      if (label !== lastLabel) { groups.push({ head: label }); lastLabel = label; }
+      groups.push({ note: n });
+    }
+  } else {
+    for (const n of notes) groups.push({ note: n });
+  }
+  for (const entry of groups) {
+    if (entry.head) {
+      const hd = document.createElement('div');
+      hd.className = 'note-group-head';
+      hd.textContent = entry.head;
+      root.appendChild(hd);
+      continue;
+    }
+    const note = entry.note;
     const d = new Date(note.updatedAt || note.createdAt);
     const cov = paperInfo(note.paper.color);
     const item = document.createElement('div');
@@ -2130,6 +2159,7 @@ async function init() {
 }
 
 init();
+
 
 
 
