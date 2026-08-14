@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.8';
+const APP_VERSION = '4.9';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -69,7 +69,11 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     saveSoon(true);
   },
   onTextTap: (w) => createTextEdit(w),
-  onTwoFingerTap: () => { if (state.lib.settings.twoFingerUndo !== false) undo(); }
+  onTwoFingerTap: () => {
+    const a = state.lib.settings.twoFingerAction || 'undo';
+    if (a === 'undo') undo();
+    else if (a === 'redo') redo();
+  }
 });
 let moveBefore = null;
 
@@ -175,10 +179,22 @@ function openNote(noteId, notebookId, subjectId, pageIndex) {
   updateToolUI();
   updateColorUI();
   state.lib.active = { subjectId: state.activeSubjectId, notebookId: state.activeNotebookId, noteId, pageIndex: state.pageIndex };
+  pageFade();
   stopPlayback();
   if (!$('#recPanel').classList.contains('hidden')) refreshRecList();
   updateEmptyState();
   saveSoon();
+}
+
+function pageFade() {
+  const cv = document.querySelector('#viewCanvas');
+  if (!cv) return;
+  cv.style.transition = 'none';
+  cv.style.opacity = '0';
+  requestAnimationFrame(() => {
+    cv.style.transition = 'opacity .18s ease';
+    cv.style.opacity = '1';
+  });
 }
 
 function switchPage(i) {
@@ -186,6 +202,7 @@ function switchPage(i) {
   if (!note || i < 0 || i >= note.pages.length) return;
   state.pageIndex = i;
   engine.setPage(currentPage());
+  pageFade();
   engine.fitView();
   engine.invalidateRaster();
   renderPages();
@@ -696,6 +713,23 @@ function renderSettings() {
       pos.appendChild(b);
     });
   }
+  // 双指轻点手势
+  const tfRow = $('#twoFingerRow');
+  if (tfRow) {
+    tfRow.innerHTML = '';
+    [['undo', '撤销'], ['redo', '重做'], ['off', '关闭']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.twoFingerAction || 'undo') === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        st.twoFingerAction = v;
+        st.twoFingerUndo = v !== 'off';
+        saveLibrary(state.lib);
+        renderSettings();
+      });
+      tfRow.appendChild(b);
+    });
+  }
   // 外观主题
   const themeEl = $('#themeRow');
   if (themeEl) {
@@ -835,7 +869,13 @@ function renderNoteList() {
       <span class="ni-cover"></span>
       <span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>
       <button class="ni-more" aria-label="更多"><svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>`;
-    item.querySelector('.ni-cover').style.background = cov.bg;
+    const coverEl = item.querySelector('.ni-cover');
+    coverEl.style.background = cov.bg;
+    if (note.pages && note.pages[0]) {
+      const cv = document.createElement('canvas');
+      renderPageToCanvas(cv, note.pages[0], note.paper, 90, FONT);
+      coverEl.appendChild(cv);
+    }
     if (note.pinned) {
       const pin = document.createElement('span');
       pin.className = 'ni-pin';
@@ -921,7 +961,9 @@ function togglePin(note) {
 }
 
 function createNote() {
-  const note = newNote(state.activeNotebookId || firstNotebookId(), '未命名笔记', state.lib.settings.defaultPaper || { style: 'line', color: 'white' });
+  const d = new Date();
+  const autoTitle = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const note = newNote(state.activeNotebookId || firstNotebookId(), autoTitle, state.lib.settings.defaultPaper || { style: 'line', color: 'white' });
   state.lib.notes[note.id] = note;
   let nb = findNotebook(state.lib, note.notebookId);
   if (!nb) {
@@ -1582,6 +1624,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 

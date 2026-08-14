@@ -30,7 +30,7 @@ export function newLibrary() {
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'left', eraserSize: 24,
       defaultPaper: { style: 'line', color: 'white' },
-      autoPage: true, twoFingerUndo: true,
+      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo',
       theme: 'auto'
     },
     subjects: [
@@ -149,10 +149,14 @@ export function sanitize(raw) {
     penWidth: 5, hlWidth: 14, hlColor: '#fde047',
     toolbar: 'left', eraserSize: 24,
     defaultPaper: { style: 'line', color: 'white' },
-    autoPage: true, twoFingerUndo: true,
+    autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo',
     theme: 'auto'
   }, lib.settings || {});
   if (!lib.settings.theme) lib.settings.theme = 'auto';
+  // 迁移：旧 twoFingerUndo 开关 -> twoFingerAction
+  if (!lib.settings.twoFingerAction) {
+    lib.settings.twoFingerAction = lib.settings.twoFingerUndo === false ? 'off' : 'undo';
+  }
   // v1/v2 -> v3：彻底移除放大镜，补充新设置字段
   if (raw.version < 3) {
     delete lib.settings.loupe;
@@ -296,6 +300,7 @@ export async function deleteRecTimeline(noteId, recId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 
 
 
