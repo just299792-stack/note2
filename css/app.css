@@ -734,3 +734,7 @@ body.theme-light .topbar {
 .ni-check .ic { width: 12px; height: 12px; display: none; }
 .ni-check.on .ic { display: block; }
 .note-item.multi { cursor: pointer; }
+
+/* 笔记排序条 */
+.note-sort { margin: 0 10px 8px; }
+.note-sort button { padding: 5px 4px; font-size: 11.5px; }

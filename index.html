@@ -115,6 +115,7 @@
             <div class="menu-sec-title">导出 / 转移</div>
             <button class="menu-item" data-action="export-note">导出本笔记 (.note)</button>
             <button class="menu-item" data-action="export-pdf">导出为 PDF</button>
+            <button class="menu-item" data-action="export-page-png">导出当前页为图片</button>
             <button class="menu-item" data-action="export-library">导出整个资料库</button>
             <button class="menu-item" data-action="import">导入笔记文件…</button>
             <div class="menu-sec-title">账户</div>
@@ -148,6 +149,7 @@
         <button id="btnNewNote" class="mini-btn primary" title="新建笔记">＋ 笔记</button>
       </div>
       <div id="subjectList" class="subject-list"></div>
+      <div id="noteSort" class="seg note-sort"></div>
       <div class="note-search-wrap"><svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg><input id="noteSearch" type="search" placeholder="搜索笔记" autocomplete="off"></div>
       <div id="noteList" class="note-list"></div>
       <div class="lib-foot">
@@ -246,6 +248,7 @@
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
+
 
 
 

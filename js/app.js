@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.12';
+const APP_VERSION = '4.13';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -29,6 +29,7 @@ const state = {
   rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [] },
   recSupported: !!(navigator.mediaDevices && window.MediaRecorder),
   searchQuery: '',
+  noteSort: 'updated',
   saving: false,
   multi: { on: false, selected: new Set() }
 };
@@ -471,6 +472,7 @@ function bindUI() {
     $('#moreMenu').classList.add('hidden');
     if (act === 'export-note') exportNote();
     if (act === 'export-pdf') exportPdf();
+    if (act === 'export-page-png') exportPagePng();
     if (act === 'export-library') exportLibrary();
     if (act === 'import') $('#fileInput').click();
     if (act === 'add-page') addPage();
@@ -929,6 +931,25 @@ function updateEmptyState() {
   if (el) el.classList.toggle('hidden', !!currentNote());
 }
 
+function renderNoteSortUI() {
+  const seg = $('#noteSort');
+  if (!seg) return;
+  const cur = state.noteSort || 'updated';
+  seg.innerHTML = '';
+  [['updated', '最近'], ['created', '创建'], ['title', '标题']].forEach(([v, label]) => {
+    const b = document.createElement('button');
+    b.className = cur === v ? 'active' : '';
+    b.textContent = label;
+    b.addEventListener('click', () => {
+      state.noteSort = v;
+      state.lib.settings.noteSort = v;
+      saveLibrary(state.lib);
+      renderNoteList();
+    });
+    seg.appendChild(b);
+  });
+}
+
 function renderNoteList() {
   const root = $('#noteList');
   root.innerHTML = '';
@@ -941,7 +962,13 @@ function renderNoteList() {
       n.pages.some(pg => pg.texts.some(t => (t.text || '').toLowerCase().includes(q)))
     );
   }
-  notes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
+  const sortBy = state.noteSort || 'updated';
+  notes.sort((a, b) => {
+    if (sortBy === 'title') return a.title.localeCompare(b.title, 'zh');
+    if (sortBy === 'created') return (b.createdAt || 0) - (a.createdAt || 0);
+    return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+  renderNoteSortUI();
   if (!notes.length) {
     const empty = document.createElement('div');
     empty.className = 'note-item';
@@ -1416,6 +1443,16 @@ async function exportNote() {
   const data = { format: 'note2', version: 1, type: 'note', exportedAt: new Date().toISOString(), note };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   await shareOrDownload(blob, safeName(note.title) + '.note');
+}
+
+async function exportPagePng() {
+  const note = currentNote();
+  if (!note || !currentPage()) return;
+  const cv = document.createElement('canvas');
+  renderPageToCanvas(cv, currentPage(), note.paper, 1224, FONT);
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  if (!blob) { toast('导出失败'); return; }
+  await shareOrDownload(blob, safeName(note.title) + '-第' + (state.pageIndex + 1) + '页.png');
 }
 
 async function exportPdf() {
@@ -1921,6 +1958,7 @@ async function init() {
   const ofEl = $('#optFinger'); if (ofEl) ofEl.checked = !!lib.settings.fingerDraw;
   const o2El = $('#optTwoFinger'); if (o2El) o2El.checked = lib.settings.twoFingerUndo !== false;
   const oaEl = $('#optAutoPage'); if (oaEl) oaEl.checked = lib.settings.autoPage !== false;
+  state.noteSort = lib.settings.noteSort || 'updated';
   renderSettings();
   applyToolbarLayout();
   applyTheme();
@@ -1958,6 +1996,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
