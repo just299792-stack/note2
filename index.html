@@ -1,0 +1,164 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="手记">
+<meta name="theme-color" content="#1e293b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-512.png">
+<title>手记 · 精美手写笔记</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app" class="app">
+  <!-- ============ 顶部工具栏 ============ -->
+  <header id="topbar" class="topbar">
+    <div class="tb-left">
+      <button id="btnLibrary" class="icon-btn" title="资料库" aria-label="资料库">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      </button>
+      <div class="tb-title">
+        <div id="titleNote" class="note-title" contenteditable="false" spellcheck="false">未命名笔记</div>
+        <div id="titleMeta" class="note-meta"></div>
+      </div>
+    </div>
+
+    <div class="tb-tools" id="toolbar">
+      <button class="tool-btn active" data-tool="pen" title="钢笔" aria-label="钢笔">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>
+        <span class="tool-name">钢笔</span>
+      </button>
+      <button class="tool-btn" data-tool="highlighter" title="荧光笔" aria-label="荧光笔">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M5 19l6-12 6 12M7 15h10" stroke-width="2.4" fill="none"/></svg>
+        <span class="tool-name">荧光</span>
+      </button>
+      <button class="tool-btn" data-tool="eraser" title="橡皮擦" aria-label="橡皮擦">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M14.5 4.5l5 5-9 9-5-5zM10 19h9"/></svg>
+        <span class="tool-name">橡皮</span>
+      </button>
+      <button class="tool-btn" data-tool="lasso" title="套索" aria-label="套索">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M5 8a7 7 0 0 1 14 0c0 3.3-2.2 6-5 6.6V18" fill="none"/></svg>
+        <span class="tool-name">套索</span>
+      </button>
+      <button class="tool-btn" data-tool="text" title="文字" aria-label="文字">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M5 7V5h14v2M12 5v14m-3 0h6"/></svg>
+        <span class="tool-name">文字</span>
+      </button>
+      <button class="tool-btn" data-tool="shape" title="形状" aria-label="形状">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M4 20L20 4M4 20h12M20 4v12" fill="none"/></svg>
+        <span class="tool-name">形状</span>
+      </button>
+
+      <span class="tb-divider"></span>
+
+      <button id="btnColor" class="color-btn" title="颜色与粗细" aria-label="颜色与粗细">
+        <span class="color-dot" id="colorDot"></span>
+      </button>
+      <button id="btnUndo" class="icon-btn" title="撤销" aria-label="撤销" disabled>
+        <svg viewBox="0 0 24 24" class="ic"><path d="M9 7L4 12l5 5M4 12h9a6 6 0 0 1 6 6"/></svg>
+      </button>
+      <button id="btnRedo" class="icon-btn" title="重做" aria-label="重做" disabled>
+        <svg viewBox="0 0 24 24" class="ic"><path d="M15 7l5 5-5 5M20 12h-9a6 6 0 0 0-6 6"/></svg>
+      </button>
+
+      <span class="tb-divider"></span>
+
+      <button id="btnPages" class="icon-btn" title="页面缩略图" aria-label="页面缩略图">
+        <svg viewBox="0 0 24 24" class="ic"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+      </button>
+      <div class="tb-menu-wrap">
+        <button id="btnMore" class="icon-btn" title="更多" aria-label="更多">
+          <svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+        </button>
+        <div id="moreMenu" class="menu hidden">
+          <div class="menu-sec-title">纸张</div>
+          <div id="paperStyles" class="paper-row"></div>
+          <div id="paperColors" class="paper-colors"></div>
+          <div class="menu-sec-title">导出 / 转移</div>
+          <button class="menu-item" data-action="export-note">导出本笔记 (.note)</button>
+          <button class="menu-item" data-action="export-pdf">导出为 PDF</button>
+          <button class="menu-item" data-action="export-library">导出整个资料库</button>
+          <button class="menu-item" data-action="import">导入笔记文件…</button>
+          <div class="menu-sec-title">页面</div>
+          <button class="menu-item" data-action="add-page">添加页面</button>
+          <button class="menu-item" data-action="duplicate-page">复制当前页</button>
+          <button class="menu-item danger" data-action="delete-page">删除当前页</button>
+          <div class="menu-sec-title">其他</div>
+          <label class="menu-item toggle-row"><span>手指书写</span><input type="checkbox" id="optFinger"></label>
+          <label class="menu-item toggle-row"><span>放大镜</span><input type="checkbox" id="optLoupe" checked></label>
+          <button class="menu-item" data-action="about">关于「手记」</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ 主体 ============ -->
+  <div id="main" class="main">
+
+    <!-- 资料库侧栏 -->
+    <aside id="library" class="library hidden-mobile">
+      <div class="lib-head">
+        <span class="lib-title">资料库</span>
+        <button id="btnNewNote" class="mini-btn primary" title="新建笔记">＋ 笔记</button>
+      </div>
+      <div id="subjectList" class="subject-list"></div>
+      <div id="noteList" class="note-list"></div>
+      <div class="lib-foot">
+        <button id="btnNewSubject" class="mini-btn">＋ 科目</button>
+        <button id="btnNewNotebook" class="mini-btn">＋ 笔记本</button>
+      </div>
+    </aside>
+
+    <!-- 画布区 -->
+    <section id="canvas-area" class="canvas-area">
+      <div id="paperHolder" class="paper-holder">
+        <canvas id="viewCanvas"></canvas>
+        <div id="textLayer" class="text-layer"></div>
+        <div id="loupe" class="loupe hidden"><canvas id="loupeCanvas"></canvas></div>
+      </div>
+      <div id="pageNav" class="page-nav">
+        <button id="btnPrevPage" class="icon-btn sm" aria-label="上一页"><svg viewBox="0 0 24 24" class="ic"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <span id="pageIndicator">1 / 1</span>
+        <button id="btnNextPage" class="icon-btn sm" aria-label="下一页"><svg viewBox="0 0 24 24" class="ic"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+    </section>
+
+    <!-- 页面缩略图侧栏 -->
+    <aside id="pagesPanel" class="pages-panel hidden-mobile">
+      <div class="pages-head">
+        <span>页面</span>
+        <button id="btnAddPage" class="mini-btn primary" title="添加页面">＋</button>
+      </div>
+      <div id="pagesList" class="pages-list"></div>
+    </aside>
+  </div>
+
+  <!-- 颜色/粗细 弹层 -->
+  <div id="colorPop" class="pop hidden">
+    <div id="colorSwatches" class="swatches"></div>
+    <div class="width-row">
+      <span class="width-label">粗细</span>
+      <input id="widthSlider" type="range" min="1" max="30" step="0.5" value="5">
+      <span id="widthValue" class="width-value">5</span>
+    </div>
+    <div class="shape-row hidden" id="shapeRow">
+      <button class="shape-btn active" data-shape="line">直线</button>
+      <button class="shape-btn" data-shape="rect">矩形</button>
+      <button class="shape-btn" data-shape="ellipse">椭圆</button>
+      <button class="shape-btn" data-shape="arrow">箭头</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <input type="file" id="fileInput" accept=".note,.notebook,.json,application/json" hidden>
+  <div id="modalRoot"></div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
