@@ -30,7 +30,8 @@ export function newLibrary() {
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'left', eraserSize: 24,
       defaultPaper: { style: 'line', color: 'white' },
-      autoPage: true, twoFingerUndo: true
+      autoPage: true, twoFingerUndo: true,
+      theme: 'auto'
     },
     subjects: [
       { id: subjId, name: '我的项目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [note.id] } ] }
@@ -148,8 +149,10 @@ export function sanitize(raw) {
     penWidth: 5, hlWidth: 14, hlColor: '#fde047',
     toolbar: 'left', eraserSize: 24,
     defaultPaper: { style: 'line', color: 'white' },
-    autoPage: true, twoFingerUndo: true
+    autoPage: true, twoFingerUndo: true,
+    theme: 'auto'
   }, lib.settings || {});
+  if (!lib.settings.theme) lib.settings.theme = 'auto';
   // v1/v2 -> v3：彻底移除放大镜，补充新设置字段
   if (raw.version < 3) {
     delete lib.settings.loupe;
@@ -177,6 +180,7 @@ export function sanitize(raw) {
     if (!n || typeof n !== 'object') { delete lib.notes[id]; continue; }
     n.id = n.id || id;
     n.title = typeof n.title === 'string' ? n.title : '未命名笔记';
+    n.pinned = !!n.pinned;
     n.paper = Object.assign({ style: 'line', color: 'white' }, n.paper || {});
     n.pages = Array.isArray(n.pages) && n.pages.length ? n.pages : [newPage()];
     n.pages = n.pages.map(sanitizePage);
@@ -292,6 +296,7 @@ export async function deleteRecTimeline(noteId, recId) {
     tx.onerror = () => reject(tx.error);
   });
 }
+
 
 
 

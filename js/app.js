@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.7';
+const APP_VERSION = '4.8';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -563,6 +563,12 @@ function updatePaperUI() {
 }
 
 /* ---------------- 设置面板与工具栏布局 ---------------- */
+function applyTheme() {
+  const t = state.lib.settings.theme || 'auto';
+  document.body.classList.toggle('theme-dark', t === 'dark');
+  document.body.classList.toggle('theme-light', t === 'light');
+}
+
 function applyToolbarLayout() {
   const want = state.lib.settings.toolbar || 'left';
   const eff = (want === 'top' || window.innerWidth < 560) ? 'top' : want;
@@ -690,6 +696,18 @@ function renderSettings() {
       pos.appendChild(b);
     });
   }
+  // 外观主题
+  const themeEl = $('#themeRow');
+  if (themeEl) {
+    themeEl.innerHTML = '';
+    [['auto', '跟随系统'], ['light', '浅色'], ['dark', '深色']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.theme || 'auto') === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.theme = v; saveLibrary(state.lib); applyTheme(); renderSettings(); });
+      themeEl.appendChild(b);
+    });
+  }
 }
 
 function setPaper(style, color) {
@@ -793,8 +811,13 @@ function renderNoteList() {
   const f = findNotebook(state.lib, state.activeNotebookId);
   let notes = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
   const q = (state.searchQuery || '').trim().toLowerCase();
-  if (q) notes = notes.filter(n => n.title.toLowerCase().includes(q));
-  notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  if (q) {
+    notes = notes.filter(n =>
+      n.title.toLowerCase().includes(q) ||
+      n.pages.some(pg => pg.texts.some(t => (t.text || '').toLowerCase().includes(q)))
+    );
+  }
+  notes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (b.updatedAt || 0) - (a.updatedAt || 0));
   if (!notes.length) {
     const empty = document.createElement('div');
     empty.className = 'note-item';
@@ -813,6 +836,12 @@ function renderNoteList() {
       <span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>
       <button class="ni-more" aria-label="更多"><svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>`;
     item.querySelector('.ni-cover').style.background = cov.bg;
+    if (note.pinned) {
+      const pin = document.createElement('span');
+      pin.className = 'ni-pin';
+      pin.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/><path d="M12 3v1"/></svg>';
+      item.querySelector('.ni-cover').appendChild(pin);
+    }
     item.querySelector('.ni-title').textContent = note.title;
     item.querySelector('.ni-meta').textContent = `${note.pages.length} 页 · ${d.getMonth() + 1}/${d.getDate()}`;
     item.querySelector('.ni-text').addEventListener('click', () => {
@@ -833,6 +862,7 @@ function noteActions(note, anchor) {
   menu.className = 'menu ni-menu';
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -840,6 +870,7 @@ function noteActions(note, anchor) {
   menu.style.top = (r.bottom + 4) + 'px';
   document.body.appendChild(menu);
   menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNote(note); });
+  menu.querySelector('[data-act="pin"]').addEventListener('click', () => { menu.remove(); togglePin(note); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNoteConfirm(note); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -880,6 +911,13 @@ function deleteNote(noteId) {
   saveLibrary(state.lib);
   renderLibrary();
   toast('已删除笔记');
+}
+
+function togglePin(note) {
+  note.pinned = !note.pinned;
+  saveSoon(true);
+  renderNoteList();
+  toast(note.pinned ? '已置顶' : '已取消置顶');
 }
 
 function createNote() {
@@ -930,9 +968,42 @@ function renderPages() {
     num.className = 'pt-num';
     num.textContent = i + 1;
     btn.appendChild(num);
+    if (note.pages.length > 1) {
+      if (i > 0) {
+        const mL = document.createElement('button');
+        mL.className = 'pt-move left';
+        mL.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M15 6l-6 6 6 6"/></svg>';
+        mL.addEventListener('click', (e) => { e.stopPropagation(); movePage(i, -1); });
+        btn.appendChild(mL);
+      }
+      if (i < note.pages.length - 1) {
+        const mR = document.createElement('button');
+        mR.className = 'pt-move right';
+        mR.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M9 6l6 6-6 6"/></svg>';
+        mR.addEventListener('click', (e) => { e.stopPropagation(); movePage(i, 1); });
+        btn.appendChild(mR);
+      }
+    }
     btn.addEventListener('click', () => switchPage(i));
     list.appendChild(btn);
   });
+}
+
+function movePage(from, dir) {
+  const note = currentNote();
+  if (!note) return;
+  const to = from + dir;
+  if (to < 0 || to >= note.pages.length) return;
+  const before = note.pages.slice();
+  const arr = note.pages.slice();
+  const [p] = arr.splice(from, 1);
+  arr.splice(to, 0, p);
+  pushHistory('移动页面',
+    () => { note.pages = before; afterPageArrayRestore(); },
+    () => { note.pages = arr; afterPageArrayRestore(); });
+  note.pages = arr;
+  state.pageIndex = to;
+  applyPagesChange();
 }
 
 /* ---------------- 导出 / 导入 / 分享 ---------------- */
@@ -1476,6 +1547,7 @@ async function init() {
   const oaEl = $('#optAutoPage'); if (oaEl) oaEl.checked = lib.settings.autoPage !== false;
   renderSettings();
   applyToolbarLayout();
+  applyTheme();
 
   const active = lib.active || {};
   let note = active.noteId ? lib.notes[active.noteId] : null;
@@ -1510,6 +1582,9 @@ async function init() {
 }
 
 init();
+
+
+
 
 
 
