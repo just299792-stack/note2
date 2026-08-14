@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.21';
+const APP_VERSION = '4.22';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -29,6 +29,7 @@ const state = {
   rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [] },
   recSupported: !!(navigator.mediaDevices && window.MediaRecorder),
   searchQuery: '',
+  prevTool: null,
   noteSort: 'updated',
   saving: false,
   multi: { on: false, selected: new Set() }
@@ -79,12 +80,16 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     maybeAutoAdvance(st);
   },
   onShapeDone: (st) => { recCapture('stroke', st); mutate(() => currentPage().strokes.push(st), '形状'); },
-  onEraseDone: (ids) => { recCapture('erase', { ids }); mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除'); },
+  onEraseDone: (ids) => {
+    recCapture('erase', { ids });
+    mutate(() => { currentPage().strokes = currentPage().strokes.filter(s => !ids.includes(s.id)); }, '擦除');
+    switchBackFromEraser();
+  },
   onPixelEraseDone: (path, radius) => {
     const page = currentPage();
     if (!page || !path || path.length < 2) return;
     const newStrokes = pixelErase(page, path, radius);
-    if (newStrokes) mutate(() => { page.strokes = newStrokes; }, '擦除');
+    if (newStrokes) { mutate(() => { page.strokes = newStrokes; }, '擦除'); switchBackFromEraser(); }
   },
   onLassoMoveStart: () => { moveBefore = pageSnapshot(currentPage()); },
   onPageContentChanged: () => {
@@ -544,7 +549,10 @@ function bindUI() {
   // 工具按钮
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      state.tool = btn.dataset.tool;
+      const newTool = btn.dataset.tool;
+      if (newTool === 'eraser' || newTool === 'pixelEraser') state.prevTool = state.tool;
+      else state.prevTool = null;
+      state.tool = newTool;
       if (!state.colors[state.tool]) state.colors[state.tool] = state.tool === 'highlighter' ? '#fde047' : '#1e293b';
       state.color = state.colors[state.tool];
       updateToolUI();
@@ -1292,6 +1300,18 @@ function deleteNote(noteId) {
   saveLibrary(state.lib);
   renderLibrary();
   toast('已删除笔记');
+}
+
+function switchBackFromEraser() {
+  if (!state.prevTool) return;
+  const t = state.prevTool;
+  state.prevTool = null;
+  state.tool = t;
+  if (!state.colors[t]) state.colors[t] = t === 'highlighter' ? '#fde047' : '#1e293b';
+  state.color = state.colors[t];
+  updateToolUI();
+  updateColorUI();
+  $('#colorPop').classList.add('hidden');
 }
 
 function togglePin(note) {
@@ -2258,6 +2278,7 @@ async function init() {
 }
 
 init();
+
 
 
 
