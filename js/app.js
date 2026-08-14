@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.10';
+const APP_VERSION = '4.11';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -29,7 +29,8 @@ const state = {
   rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [] },
   recSupported: !!(navigator.mediaDevices && window.MediaRecorder),
   searchQuery: '',
-  saving: false
+  saving: false,
+  multi: { on: false, selected: new Set() }
 };
 let history = [];
 let histIdx = -1;
@@ -161,6 +162,7 @@ async function flushSave() {
 function openNote(noteId, notebookId, subjectId, pageIndex) {
   const note = state.lib.notes[noteId];
   if (!note) return;
+  if (state.multi.on) exitMulti();
   state.activeNoteId = noteId;
   state.activeNotebookId = notebookId || note.notebookId || firstNotebookId();
   state.activeSubjectId = subjectId || findNotebook(state.lib, state.activeNotebookId)?.subject.id || state.lib.subjects[0].id;
@@ -387,6 +389,9 @@ function bindUI() {
   if (nsEl) nsEl.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderNoteList(); });
   const enEl = $('#btnEmptyNew');
   if (enEl) enEl.addEventListener('click', createNote);
+  const mmEl = $('#multiMove'); if (mmEl) mmEl.addEventListener('click', moveSelectedNotes);
+  const mdEl = $('#multiDelete'); if (mdEl) mdEl.addEventListener('click', deleteSelectedNotes);
+  const mcEl = $('#multiCancel'); if (mcEl) mcEl.addEventListener('click', exitMulti);
   $('#btnNewSubject').addEventListener('click', () => promptModal('新建项目', '', '项目名称', '创建', (name) => {
     if (!name) return;
     state.lib.subjects.push({ id: newId(), name, notebooks: [] });
@@ -786,6 +791,8 @@ function renderLibrary() {
   for (const subj of state.lib.subjects) {
     const wrap = document.createElement('div');
     wrap.className = 'subject';
+    const row = document.createElement('div');
+    row.className = 'subject-row';
     const head = document.createElement('button');
     head.className = 'subject-head' + (state.collapsedSubjects.has(subj.id) ? '' : ' open');
     const total = subj.notebooks.reduce((a, nb) => a + nb.noteIds.length, 0);
@@ -799,7 +806,13 @@ function renderLibrary() {
       else state.collapsedSubjects.add(subj.id);
       renderLibrary();
     });
-    wrap.appendChild(head);
+    row.appendChild(head);
+    const more = document.createElement('button');
+    more.className = 'nb-more subject-more';
+    more.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>';
+    more.addEventListener('click', (e) => { e.stopPropagation(); subjectActions(subj, more); });
+    row.appendChild(more);
+    wrap.appendChild(row);
     if (!state.collapsedSubjects.has(subj.id)) {
       const nbs = document.createElement('div');
       nbs.className = 'notebooks';
@@ -816,6 +829,7 @@ function renderLibrary() {
         main.querySelector('.nb-name').textContent = nb.name;
         main.addEventListener('click', (e) => {
           e.stopPropagation();
+          if (state.multi.on) exitMulti();
           state.activeSubjectId = subj.id;
           state.activeNotebookId = nb.id;
           renderLibrary();
@@ -873,8 +887,10 @@ function renderNoteList() {
     const d = new Date(note.updatedAt || note.createdAt);
     const cov = paperInfo(note.paper.color);
     const item = document.createElement('div');
-    item.className = 'note-item' + (note.id === state.activeNoteId ? ' active' : '');
+    item.className = 'note-item' + (note.id === state.activeNoteId ? ' active' : '') + (state.multi.on ? ' multi' : '');
+    const sel = state.multi.on && state.multi.selected.has(note.id);
     item.innerHTML = `
+      <span class="ni-check${sel ? ' on' : ''}"><svg viewBox="0 0 24 24" class="ic"><path d="M5 12l5 5 9-10"/></svg></span>
       <span class="ni-cover"></span>
       <span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>
       <button class="ni-more" aria-label="更多"><svg viewBox="0 0 24 24" class="ic"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>`;
@@ -893,7 +909,9 @@ function renderNoteList() {
     }
     item.querySelector('.ni-title').textContent = note.title;
     item.querySelector('.ni-meta').textContent = `${note.pages.length} 页 · ${d.getMonth() + 1}/${d.getDate()}`;
-    item.querySelector('.ni-text').addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.ni-more')) return;
+      if (state.multi.on) { toggleSelect(note.id); return; }
       openNote(note.id);
       if (window.innerWidth <= 820) $('#library').classList.add('hidden-mobile');
     });
@@ -912,6 +930,7 @@ function noteActions(note, anchor) {
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
     <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
+    <button class="menu-item" data-act="multi"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h4M4 12h4M4 18h4M11 6h9M11 12h9M11 18h9"/></svg>多选</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -920,6 +939,7 @@ function noteActions(note, anchor) {
   document.body.appendChild(menu);
   menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNote(note); });
   menu.querySelector('[data-act="pin"]').addEventListener('click', () => { menu.remove(); togglePin(note); });
+  menu.querySelector('[data-act="multi"]').addEventListener('click', () => { menu.remove(); enterMulti(); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNoteConfirm(note); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -1051,6 +1071,151 @@ function deleteNotebook(nb) {
   saveLibrary(state.lib);
   renderLibrary();
   toast('已删除笔记本');
+}
+
+/* ---------------- 笔记多选 ---------------- */
+function enterMulti() {
+  state.multi.on = true;
+  state.multi.selected.clear();
+  renderNoteList();
+  renderMultiBar();
+}
+function exitMulti() {
+  state.multi.on = false;
+  state.multi.selected.clear();
+  renderNoteList();
+  renderMultiBar();
+}
+function toggleSelect(id) {
+  if (state.multi.selected.has(id)) state.multi.selected.delete(id);
+  else state.multi.selected.add(id);
+  renderNoteList();
+  renderMultiBar();
+}
+function renderMultiBar() {
+  const bar = $('#multiBar');
+  if (!bar) return;
+  bar.classList.toggle('hidden', !state.multi.on);
+  const c = $('#multiCount');
+  if (c) c.textContent = '已选 ' + state.multi.selected.size;
+}
+function moveSelectedNotes() {
+  if (!state.multi.selected.size) { toast('请先选择笔记'); return; }
+  const nbs = [];
+  for (const s of state.lib.subjects) for (const nb of s.notebooks) nbs.push(nb);
+  if (nbs.length <= 1) { toast('没有其他笔记本可移动'); return; }
+  const { body } = modalShell('移动到…', '<div class="copy-list"></div>', [{ label: '取消' }]);
+  const list = body.querySelector('.copy-list');
+  for (const nb of nbs) {
+    const b = document.createElement('button');
+    b.className = 'menu-item';
+    b.textContent = nb.name;
+    b.addEventListener('click', () => {
+      closeModal();
+      const ids = [...state.multi.selected];
+      for (const id of ids) {
+        const note = state.lib.notes[id];
+        if (!note) continue;
+        for (const s of state.lib.subjects) for (const nb2 of s.notebooks) {
+          const i = nb2.noteIds.indexOf(id);
+          if (i >= 0) nb2.noteIds.splice(i, 1);
+        }
+        note.notebookId = nb.id;
+        nb.noteIds.push(id);
+      }
+      saveLibrary(state.lib);
+      exitMulti();
+      renderLibrary();
+      toast('已移动 ' + ids.length + ' 篇笔记');
+    });
+    list.appendChild(b);
+  }
+}
+function deleteSelectedNotes() {
+  if (!state.multi.selected.size) { toast('请先选择笔记'); return; }
+  const count = state.multi.selected.size;
+  confirmModal(`删除选中的 ${count} 篇笔记？`, '删除后无法恢复。', '删除', true, () => {
+    const ids = [...state.multi.selected];
+    for (const id of ids) {
+      for (const s of state.lib.subjects) for (const nb of s.notebooks) {
+        const i = nb.noteIds.indexOf(id);
+        if (i >= 0) nb.noteIds.splice(i, 1);
+      }
+      delete state.lib.notes[id];
+    }
+    if (state.activeNoteId && ids.includes(state.activeNoteId)) {
+      const f = findNotebook(state.lib, state.activeNotebookId);
+      const remaining = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
+      if (remaining.length) openNote(remaining[0].id);
+      else { state.activeNoteId = null; renderLibrary(); engine.setPage(null); engine.invalidateRaster(); updatePageNav(); updateEmptyState(); }
+    }
+    exitMulti();
+    renderLibrary();
+    toast('已删除 ' + ids.length + ' 篇笔记');
+  });
+}
+
+/* ---------------- 项目操作 ---------------- */
+function subjectActions(subj, anchor) {
+  document.querySelectorAll('.ni-menu').forEach(m => m.remove());
+  const menu = document.createElement('div');
+  menu.className = 'menu ni-menu';
+  menu.innerHTML = `
+    <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
+  const r = anchor.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 190)) + 'px';
+  menu.style.top = (r.bottom + 4) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameSubject(subj); });
+  menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteSubjectConfirm(subj); });
+  setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
+}
+
+function renameSubject(subj) {
+  promptModal('重命名项目', '', '项目名称', '保存', (name) => {
+    if (!name) return;
+    subj.name = name;
+    saveLibrary(state.lib);
+    renderLibrary();
+    toast('已重命名');
+  });
+}
+
+function deleteSubjectConfirm(subj) {
+  const nbCount = subj.notebooks.length;
+  const noteCount = subj.notebooks.reduce((a, nb) => a + nb.noteIds.length, 0);
+  confirmModal(`删除项目「${subj.name}」？`, noteCount ? `该项目下的 ${nbCount} 个笔记本和 ${noteCount} 篇笔记都会一并删除，无法恢复。` : '该项目将被删除。', '删除', true, () => deleteSubject(subj));
+}
+
+function deleteSubject(subj) {
+  const idx = state.lib.subjects.findIndex(s => s.id === subj.id);
+  if (idx < 0) return;
+  state.lib.subjects.splice(idx, 1);
+  subj.notebooks.forEach(nb => nb.noteIds.forEach(id => delete state.lib.notes[id]));
+  if (state.activeSubjectId === subj.id) {
+    const first = state.lib.subjects[0];
+    if (first && first.notebooks.length) {
+      state.activeSubjectId = first.id;
+      state.activeNotebookId = first.notebooks[0].id;
+      const notes = first.notebooks[0].noteIds.map(id => state.lib.notes[id]).filter(Boolean);
+      if (notes.length) openNote(notes[0].id);
+      else { state.activeNoteId = null; renderLibrary(); engine.setPage(null); engine.invalidateRaster(); updatePageNav(); updateEmptyState(); }
+    } else {
+      state.activeSubjectId = state.lib.subjects[0] ? state.lib.subjects[0].id : null;
+      state.activeNotebookId = null;
+      state.activeNoteId = null;
+      renderLibrary();
+      engine.setPage(null);
+      engine.invalidateRaster();
+      updatePageNav();
+      updateEmptyState();
+    }
+  }
+  saveLibrary(state.lib);
+  renderLibrary();
+  toast('已删除项目');
 }
 
 /* ---------------- 复制页到其他笔记 ---------------- */
@@ -1726,6 +1891,10 @@ async function init() {
 }
 
 init();
+
+
+
+
 
 
 

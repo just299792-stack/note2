@@ -202,6 +202,12 @@
 
   <div id="toast" class="toast"></div>
   <input type="file" id="fileInput" accept=".note,.notebook,.json,application/json" hidden>
+  <div id="multiBar" class="multi-bar hidden">
+    <span id="multiCount" class="multi-count">已选 0</span>
+    <button class="mini-btn" id="multiMove">移动…</button>
+    <button class="mini-btn danger" id="multiDelete">删除</button>
+    <button class="mini-btn" id="multiCancel">取消</button>
+  </div>
   <div id="modalRoot"></div>
   <!-- 录音面板 -->
   <div id="recPanel" class="rec-panel hidden">
@@ -239,6 +245,7 @@
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
+
 
 
 
