@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.17';
+const APP_VERSION = '4.18';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -326,6 +326,13 @@ function duplicatePage() {
   applyPagesChange();
 }
 
+function clearPage() {
+  confirmModal('清空当前页？', '当前页的所有笔迹与文字都会被删除。', '清空', true, () => {
+    mutate(() => { currentPage().strokes = []; currentPage().texts = []; }, '清空页面');
+    toast('已清空当前页');
+  });
+}
+
 function deletePage() {
   const note = currentNote();
   if (!note || note.pages.length <= 1) { toast('至少保留一页'); return; }
@@ -536,6 +543,7 @@ function bindUI() {
     if (act === 'duplicate-page') duplicatePage();
     if (act === 'copy-page-to') copyPageTo();
     if (act === 'delete-page') deletePage();
+    if (act === 'clear-page') clearPage();
     if (act === 'account') { if (state.auth) logout(true); else openAuthModal('login'); }
     if (act === 'logout') logout(true);
     if (act === 'reset-settings') resetSettings();
@@ -1693,6 +1701,7 @@ function aboutModal() {
       · 笔记本 / 项目组织，页面管理<br>
       · 导出 .note / PDF，通过分享或文件转移<br>
       · 离线可用，数据保存在本机<br>
+      · 开源仓库：github.com/just299792-stack/note2<br>
       <br>
       资料库：${state.lib.subjects.length} 个项目 · ${state.lib.subjects.reduce((a, s) => a + s.notebooks.length, 0)} 个笔记本 · ${Object.keys(state.lib.notes).length} 篇笔记 · ${Object.values(state.lib.notes).reduce((a, n) => a + n.pages.length, 0)} 页<br>
       <br>
@@ -2121,6 +2130,8 @@ async function init() {
 }
 
 init();
+
+
 
 
 
