@@ -7,7 +7,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, sanitize
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.14';
+const APP_VERSION = '4.15';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1082,6 +1082,7 @@ function noteActions(note, anchor) {
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
     <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
     <button class="menu-item" data-act="multi"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h4M4 12h4M4 18h4M11 6h9M11 12h9M11 18h9"/></svg>多选</button>
+    <button class="menu-item" data-act="copy"><svg viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制笔记</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -1091,6 +1092,7 @@ function noteActions(note, anchor) {
   menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNote(note); });
   menu.querySelector('[data-act="pin"]').addEventListener('click', () => { menu.remove(); togglePin(note); });
   menu.querySelector('[data-act="multi"]').addEventListener('click', () => { menu.remove(); enterMulti(); });
+  menu.querySelector('[data-act="copy"]').addEventListener('click', () => { menu.remove(); duplicateNote(note); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNoteConfirm(note); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -1138,6 +1140,23 @@ function togglePin(note) {
   saveSoon(true);
   renderNoteList();
   toast(note.pinned ? '已置顶' : '已取消置顶');
+}
+
+function duplicateNote(note) {
+  const copy = JSON.parse(JSON.stringify(note));
+  copy.id = newId();
+  copy.title = note.title + ' 副本';
+  copy.createdAt = Date.now();
+  copy.updatedAt = Date.now();
+  copy.pages.forEach(p => { p.id = newId(); p.strokes.forEach(s => s.id = newId()); p.texts.forEach(t => t.id = newId()); });
+  copy.notebookId = note.notebookId;
+  state.lib.notes[copy.id] = copy;
+  const nb = findNotebook(state.lib, note.notebookId);
+  if (nb) nb.notebook.noteIds.push(copy.id);
+  saveLibrary(state.lib);
+  renderNoteList();
+  openNote(copy.id);
+  toast('已复制笔记');
 }
 
 function createNote() {
@@ -1652,6 +1671,8 @@ function aboutModal() {
       · 导出 .note / PDF，通过分享或文件转移<br>
       · 离线可用，数据保存在本机<br>
       <br>
+      资料库：${state.lib.subjects.length} 个项目 · ${state.lib.subjects.reduce((a, s) => a + s.notebooks.length, 0)} 个笔记本 · ${Object.keys(state.lib.notes).length} 篇笔记 · ${Object.values(state.lib.notes).reduce((a, n) => a + n.pages.length, 0)} 页<br>
+      <br>
       版本 ${APP_VERSION} · 2026-08-14
     </div>`, [
     { label: '好的', primary: true }
@@ -2053,6 +2074,7 @@ async function init() {
 }
 
 init();
+
 
 
 
