@@ -93,88 +93,7 @@
           <button id="btnMore" class="icon-btn" title="设置" aria-label="设置">
             <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="4.9"/><circle cx="12" cy="12" r="1.6"/><path d="M12 3v1.9M12 19.1V21M3 12h1.9M19.1 12H21M5.2 5.2l1.3 1.3M17.5 17.5l1.3 1.3M18.8 5.2l-1.3 1.3M6.5 17.5l-1.3 1.3"/></svg>
           </button>
-          <div id="settingsPanel" class="settings-panel hidden">
-    <div class="settings-head">
-      <span class="settings-title">设置</span>
-      <button id="settingsClose" class="icon-btn sm" aria-label="关闭"><svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg></button>
-    </div>
-    <div class="settings-body">
-      <nav class="settings-nav">
-        <button class="settings-nav-item active" data-sec="appearance">外观与布局</button>
-        <button class="settings-nav-item" data-sec="tools">书写工具</button>
-        <button class="settings-nav-item" data-sec="paper">纸张</button>
-        <button class="settings-nav-item" data-sec="gesture">手势</button>
-        <button class="settings-nav-item" data-sec="pages">页面</button>
-        <button class="settings-nav-item" data-sec="data">数据与账户</button>
-        <button class="settings-nav-item" data-sec="about">关于</button>
-      </nav>
-      <div class="settings-sections">
-        <section class="settings-sec active" id="sec-appearance">
-          <div class="menu-sec-title">布局</div>
-          <div class="set-row"><span class="set-label">工具条位置</span><div id="toolbarPos" class="seg"></div></div>
-          <div class="set-row"><span class="set-label">外观主题</span><div id="themeRow" class="seg"></div></div>
-          <div class="menu-sec-title">界面</div>
-          <label class="menu-item toggle-row"><span>收藏工具条</span><input type="checkbox" id="optFavBar"></label>
-          <label class="menu-item toggle-row"><span>自动备份</span><input type="checkbox" id="optAutoBackup"></label>
-          <button class="menu-item" data-action="reset-settings">恢复默认设置</button>
-        </section>
-        <section class="settings-sec" id="sec-tools">
-          <div class="menu-sec-title">工具默认</div>
-          <div class="set-row"><span class="set-label">钢笔</span><div id="penColors" class="mini-swatches"></div></div>
-          <div class="set-row"><span class="set-label">荧光笔</span><div id="hlColors" class="mini-swatches"></div></div>
-          <div class="set-row"><span class="set-label">圆珠笔</span><div id="ballpenColors" class="mini-swatches"></div></div>
-          <div class="set-row"><span class="set-label">笔型</span><div id="penStyleRow" class="seg"></div></div>
-          <div class="set-row"><span class="set-label">橡皮擦</span><div id="eraserSizes" class="seg"></div></div>
-          <div class="set-row"><span class="set-label">橡皮模式</span><div id="eraserMode" class="seg"></div></div>
-          <div class="set-row"><span class="set-label">文字字号</span><div id="textSizeRow" class="seg"></div></div>
-          <button class="menu-item" data-action="text-presets">文字样式预设…</button>
-        </section>
-        <section class="settings-sec" id="sec-paper">
-          <div class="menu-sec-title">当前笔记纸张</div>
-          <div id="paperStyles" class="paper-row"></div>
-          <div id="paperColors" class="paper-colors"></div>
-          <div class="menu-sec-title">新笔记默认纸张</div>
-          <div id="defaultPaperRow" class="set-row"></div>
-        </section>
-        <section class="settings-sec" id="sec-gesture">
-          <div class="menu-sec-title">手势</div>
-          <div class="set-row"><span class="set-label">双指轻点</span><div id="twoFingerRow" class="seg"></div></div>
-          <div class="set-row"><span class="set-label">三指轻点</span><div id="threeFingerRow" class="seg"></div></div>
-          <label class="menu-item toggle-row"><span>写到页尾自动翻页</span><input type="checkbox" id="optAutoPage"></label>
-          <label class="menu-item toggle-row"><span>手指书写</span><input type="checkbox" id="optFinger"></label>
-        </section>
-        <section class="settings-sec" id="sec-pages">
-          <div class="menu-sec-title">当前笔记</div>
-          <button class="menu-item" data-action="add-page">添加页面</button>
-          <button class="menu-item" data-action="duplicate-page">复制当前页</button>
-          <button class="menu-item" data-action="copy-page-to">复制当前页到其他笔记…</button>
-          <button class="menu-item danger" data-action="delete-page">删除当前页</button>
-          <button class="menu-item" data-action="clear-page">清空当前页</button>
-          <button class="menu-item" data-action="clear-blank-pages">删除空白页</button>
-        </section>
-        <section class="settings-sec" id="sec-data">
-          <div class="menu-sec-title">导出 / 转移</div>
-          <button class="menu-item" data-action="export-note">导出本笔记 (.note)</button>
-          <button class="menu-item" data-action="export-pdf">导出为 PDF</button>
-          <button class="menu-item" data-action="export-page-png">导出当前页为图片</button>
-          <button class="menu-item" data-action="export-library">导出整个资料库</button>
-          <button class="menu-item" data-action="import">导入笔记文件…</button>
-          <button class="menu-item" data-action="import-pdf">导入 PDF 标注…</button>
-          <button class="menu-item" data-action="insert-image">插入图片…</button>
-          <button class="menu-item" data-action="insert-camera">拍照插入</button>
-          <button class="menu-item" data-action="present">演示模式</button>
-          <div class="menu-sec-title">账户与备份</div>
-          <button class="menu-item" data-action="account">登录 / 注册…</button>
-          <button class="menu-item" data-action="logout">退出登录</button>
-          <button class="menu-item" data-action="snapshots">备份快照…</button>
-        </section>
-        <section class="settings-sec" id="sec-about">
-          <div class="menu-sec-title">关于</div>
-          <button class="menu-item" data-action="about">关于「笔记」</button>
-        </section>
-      </div>
-    </div>
-  </div>
+          
         </div>
       </div>
     </div>
@@ -260,6 +179,88 @@
     <div class="style-row hidden" id="styleRow"></div>
   </div>
 
+<div id="settingsPanel" class="settings-panel hidden">
+    <div class="settings-head">
+      <span class="settings-title">设置</span>
+      <button id="settingsClose" class="icon-btn sm" aria-label="关闭"><svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg></button>
+    </div>
+    <div class="settings-body">
+      <nav class="settings-nav">
+        <button class="settings-nav-item active" data-sec="appearance">外观与布局</button>
+        <button class="settings-nav-item" data-sec="tools">书写工具</button>
+        <button class="settings-nav-item" data-sec="paper">纸张</button>
+        <button class="settings-nav-item" data-sec="gesture">手势</button>
+        <button class="settings-nav-item" data-sec="pages">页面</button>
+        <button class="settings-nav-item" data-sec="data">数据与账户</button>
+        <button class="settings-nav-item" data-sec="about">关于</button>
+      </nav>
+      <div class="settings-sections">
+        <section class="settings-sec active" id="sec-appearance">
+          <div class="menu-sec-title">布局</div>
+          <div class="set-row"><span class="set-label">工具条位置</span><div id="toolbarPos" class="seg"></div></div>
+          <div class="set-row"><span class="set-label">外观主题</span><div id="themeRow" class="seg"></div></div>
+          <div class="menu-sec-title">界面</div>
+          <label class="menu-item toggle-row"><span>收藏工具条</span><input type="checkbox" id="optFavBar"></label>
+          <label class="menu-item toggle-row"><span>自动备份</span><input type="checkbox" id="optAutoBackup"></label>
+          <button class="menu-item" data-action="reset-settings">恢复默认设置</button>
+        </section>
+        <section class="settings-sec" id="sec-tools">
+          <div class="menu-sec-title">工具默认</div>
+          <div class="set-row"><span class="set-label">钢笔</span><div id="penColors" class="mini-swatches"></div></div>
+          <div class="set-row"><span class="set-label">荧光笔</span><div id="hlColors" class="mini-swatches"></div></div>
+          <div class="set-row"><span class="set-label">圆珠笔</span><div id="ballpenColors" class="mini-swatches"></div></div>
+          <div class="set-row"><span class="set-label">笔型</span><div id="penStyleRow" class="seg"></div></div>
+          <div class="set-row"><span class="set-label">橡皮擦</span><div id="eraserSizes" class="seg"></div></div>
+          <div class="set-row"><span class="set-label">橡皮模式</span><div id="eraserMode" class="seg"></div></div>
+          <div class="set-row"><span class="set-label">文字字号</span><div id="textSizeRow" class="seg"></div></div>
+          <button class="menu-item" data-action="text-presets">文字样式预设…</button>
+        </section>
+        <section class="settings-sec" id="sec-paper">
+          <div class="menu-sec-title">当前笔记纸张</div>
+          <div id="paperStyles" class="paper-row"></div>
+          <div id="paperColors" class="paper-colors"></div>
+          <div class="menu-sec-title">新笔记默认纸张</div>
+          <div id="defaultPaperRow" class="set-row"></div>
+        </section>
+        <section class="settings-sec" id="sec-gesture">
+          <div class="menu-sec-title">手势</div>
+          <div class="set-row"><span class="set-label">双指轻点</span><div id="twoFingerRow" class="seg"></div></div>
+          <div class="set-row"><span class="set-label">三指轻点</span><div id="threeFingerRow" class="seg"></div></div>
+          <label class="menu-item toggle-row"><span>写到页尾自动翻页</span><input type="checkbox" id="optAutoPage"></label>
+          <label class="menu-item toggle-row"><span>手指书写</span><input type="checkbox" id="optFinger"></label>
+        </section>
+        <section class="settings-sec" id="sec-pages">
+          <div class="menu-sec-title">当前笔记</div>
+          <button class="menu-item" data-action="add-page">添加页面</button>
+          <button class="menu-item" data-action="duplicate-page">复制当前页</button>
+          <button class="menu-item" data-action="copy-page-to">复制当前页到其他笔记…</button>
+          <button class="menu-item danger" data-action="delete-page">删除当前页</button>
+          <button class="menu-item" data-action="clear-page">清空当前页</button>
+          <button class="menu-item" data-action="clear-blank-pages">删除空白页</button>
+        </section>
+        <section class="settings-sec" id="sec-data">
+          <div class="menu-sec-title">导出 / 转移</div>
+          <button class="menu-item" data-action="export-note">导出本笔记 (.note)</button>
+          <button class="menu-item" data-action="export-pdf">导出为 PDF</button>
+          <button class="menu-item" data-action="export-page-png">导出当前页为图片</button>
+          <button class="menu-item" data-action="export-library">导出整个资料库</button>
+          <button class="menu-item" data-action="import">导入笔记文件…</button>
+          <button class="menu-item" data-action="import-pdf">导入 PDF 标注…</button>
+          <button class="menu-item" data-action="insert-image">插入图片…</button>
+          <button class="menu-item" data-action="insert-camera">拍照插入</button>
+          <button class="menu-item" data-action="present">演示模式</button>
+          <div class="menu-sec-title">账户与备份</div>
+          <button class="menu-item" data-action="account">登录 / 注册…</button>
+          <button class="menu-item" data-action="logout">退出登录</button>
+          <button class="menu-item" data-action="snapshots">备份快照…</button>
+        </section>
+        <section class="settings-sec" id="sec-about">
+          <div class="menu-sec-title">关于</div>
+          <button class="menu-item" data-action="about">关于「笔记」</button>
+        </section>
+      </div>
+    </div>
+  </div>
   <div id="presMode" class="pres-mode hidden">
     <canvas id="presCanvas"></canvas>
     <div class="pres-bar">
