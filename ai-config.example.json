@@ -1,0 +1,7 @@
+{
+  "apiKey": "",
+  "model": "deepseek-chat",
+  "baseUrl": "https://api.deepseek.com",
+  "mock": false,
+  "_comment": "把 apiKey 填成你的 DeepSeek API Key；mock 为 true 时本地模拟回复（用于测试）。改完重启 启动笔记.bat"
+}

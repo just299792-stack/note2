@@ -6,7 +6,7 @@
    ========================================================= */
 export const PAGE_W = 816;      // 逻辑页面宽 (pt)
 export const PAGE_H = 1056;     // 逻辑页面高 (pt)
-const RENDER_SCALE = 2;         // 页面光栅超采样
+const RENDER_SCALE = 2.5;         // 页面光栅超采样
 const MIN_DIST = 0.7;           // 点抽稀最小距离(世界px)
 const LINE_H = 48;              // 横线行距(世界px)，荧光笔对齐用
 

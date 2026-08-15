@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.0';
+const APP_VERSION = '5.1';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -410,6 +410,7 @@ function pageFade() {
 function switchPage(i) {
   const note = currentNote();
   if (!note || i < 0 || i >= note.pages.length) return;
+  const dir = i > state.pageIndex ? 'right' : 'left';
   state.pageIndex = i;
   engine.setPage(currentPage());
   pageFade();
@@ -419,6 +420,13 @@ function switchPage(i) {
   updatePageNav();
   state.lib.active.pageIndex = i;
   saveSoon();
+  const ph = document.querySelector('.paper-holder');
+  if (ph) {
+    ph.classList.remove('turning-right', 'turning-left');
+    void ph.offsetWidth;
+    ph.classList.add('turning-' + dir);
+    setTimeout(() => ph.classList.remove('turning-right', 'turning-left'), 280);
+  }
 }
 
 function applyPagesChange() {
@@ -2339,6 +2347,116 @@ function bindV426UI() {
     ph.addEventListener('pointercancel', () => { swipe = null; }, true);
   }
 }
+/* ---------------- AI 助手（DeepSeek，经本地服务器代理） ---------------- */
+let aiHistory = [];
+let aiBusy = false;
+
+function buildAIContext() {
+  const note = currentNote();
+  if (!note) return '（当前没有打开笔记）';
+  const texts = ((currentPage() && currentPage().texts) || []).map(t => t.text).filter(Boolean).join(' ');
+  return '用户当前笔记标题：' + note.title + '\n当前页文字内容：' + (texts.slice(0, 2000) || '（无）');
+}
+
+function appendAIMsg(role, text) {
+  const box = $('#aiMsgs');
+  const row = document.createElement('div');
+  row.className = 'ai-msg ' + role;
+  const b = document.createElement('div');
+  b.className = 'ai-bubble';
+  b.textContent = text;
+  row.appendChild(b);
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+  return b;
+}
+
+function toggleAIPanel() {
+  const panel = $('#aiPanel');
+  const open = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !open);
+  if (open) {
+    if (!$('#aiMsgs').children.length) {
+      appendAIMsg('assistant', '你好，我是 AI 助手。可以问我学习问题，也可以结合当前笔记提问。');
+    }
+    setTimeout(() => $('#aiInput').focus(), 120);
+  }
+}
+
+function updateAISend() {
+  const btn = $('#aiSend');
+  if (btn) btn.disabled = aiBusy;
+}
+
+async function sendAIMessage() {
+  if (aiBusy) return;
+  const input = $('#aiInput');
+  const text = input.value.trim();
+  if (!text) return;
+  aiBusy = true;
+  updateAISend();
+  appendAIMsg('user', text);
+  input.value = '';
+  const ctx = buildAIContext();
+  const messages = [
+    { role: 'system', content: '你是「笔记」应用里的 AI 学习助手，用简洁、有条理的中文回答。\n' + ctx },
+    ...aiHistory,
+    { role: 'user', content: text }
+  ];
+  const bubble = appendAIMsg('assistant', '…');
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, stream: true })
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      bubble.textContent = '出错了：' + (d.error || ('HTTP ' + res.status));
+      return;
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', answer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const obj = JSON.parse(payload);
+          if (obj.delta) { answer += obj.delta; bubble.textContent = answer; $('#aiMsgs').scrollTop = $('#aiMsgs').scrollHeight; }
+        } catch (_) {}
+      }
+    }
+    if (!answer) bubble.textContent = '（没有收到回复）';
+    aiHistory.push({ role: 'user', content: text });
+    aiHistory.push({ role: 'assistant', content: answer || bubble.textContent });
+    if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
+  } catch (e) {
+    bubble.textContent = '网络错误：请确认电脑端服务器已启动，且已联网';
+  } finally {
+    aiBusy = false;
+    updateAISend();
+  }
+}
+
+function bindAIUI() {
+  const fab = $('#btnAI'); if (fab) fab.addEventListener('click', toggleAIPanel);
+  const close = $('#aiClose'); if (close) close.addEventListener('click', () => $('#aiPanel').classList.add('hidden'));
+  const send = $('#aiSend'); if (send) send.addEventListener('click', sendAIMessage);
+  const input = $('#aiInput');
+  if (input) input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAIMessage(); }
+  });
+}
 /* ---------------- 弹窗 ---------------- */
 function toast(msg) {
   const el = $('#toast');
@@ -2846,6 +2964,7 @@ async function init() {
 
   bindUI();
   bindV426UI();
+  bindAIUI();
   updateToolUI();
   updateColorUI();
   const ofEl = $('#optFinger'); if (ofEl) ofEl.checked = !!lib.settings.fingerDraw;

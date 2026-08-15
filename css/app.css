@@ -906,3 +906,78 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 
 /* 更多 / 账户 下拉仍保留的通用样式微调 */
 .tb-menu-wrap .menu { min-width: 200px; border-radius: 16px; }
+
+/* ============ v5.1 AI 助手 + 翻页动画 + 渲染细化 ============ */
+.ai-fab {
+  position: fixed; right: 18px; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 260;
+  width: 54px; height: 54px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; box-shadow: 0 10px 28px rgba(99,102,241,.4);
+  transition: transform .18s, box-shadow .18s;
+}
+.ai-fab:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 14px 34px rgba(99,102,241,.5); }
+.ai-fab:active { transform: scale(.94); }
+.ai-fab .ic { width: 26px; height: 26px; stroke-width: 1.8; }
+
+.ai-panel {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 380px; max-width: 92vw; z-index: 320;
+  display: flex; flex-direction: column;
+  background: var(--bg-elev);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border-left: 1px solid var(--border);
+  box-shadow: -18px 0 50px rgba(0,0,0,.18);
+  animation: aiIn .24s cubic-bezier(.2,.9,.3,1);
+  touch-action: pan-y; overscroll-behavior: contain;
+}
+@keyframes aiIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+.ai-head {
+  display: flex; align-items: center; gap: 8px; padding: 14px 16px 10px;
+  padding-top: calc(env(safe-area-inset-top) + 12px);
+  border-bottom: 1px solid var(--border);
+}
+.ai-title { font-size: 17px; font-weight: 800; }
+.ai-model { font-size: 11px; color: var(--text-3); background: var(--bg-elev2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
+.ai-head .icon-btn { margin-left: auto; }
+.ai-msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.ai-msg { display: flex; }
+.ai-msg.user { justify-content: flex-end; }
+.ai-bubble {
+  max-width: 86%; padding: 10px 13px; border-radius: 16px; font-size: 14px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
+  background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text);
+}
+.ai-msg.user .ai-bubble {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none;
+  border-bottom-right-radius: 6px;
+}
+.ai-msg.assistant .ai-bubble { border-bottom-left-radius: 6px; }
+.ai-input-row { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px; border-top: 1px solid var(--border); }
+.ai-input-row textarea {
+  flex: 1; resize: none; min-height: 42px; max-height: 120px;
+  border-radius: 12px; border: 1px solid var(--border); background: var(--bg-elev2);
+  color: var(--text); font: 14px var(--font); padding: 9px 11px; outline: none;
+}
+.ai-input-row textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ai-input-row .mini-btn { height: 40px; padding: 0 16px; }
+.ai-hint { font-size: 10.5px; color: var(--text-3); text-align: center; padding: 0 14px 10px; }
+
+/* 翻页方向动画 */
+.paper-holder.turning-right { animation: pageInRight .26s cubic-bezier(.2,.8,.3,1); }
+.paper-holder.turning-left { animation: pageInLeft .26s cubic-bezier(.2,.8,.3,1); }
+@keyframes pageInRight { from { opacity: .35; transform: translateX(28px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes pageInLeft { from { opacity: .35; transform: translateX(-28px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* 纸面细微光晕，增加质感 */
+.paper-holder::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(130% 100% at 50% 0%, rgba(255,255,255,.06), transparent 55%);
+}
+.paper-holder > * { z-index: 0; }
+.paper-holder .text-layer { z-index: 2; }
+
+@media (max-width: 700px) {
+  .ai-fab { right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); width: 50px; height: 50px; }
+  .ai-panel { width: 100vw; }
+}

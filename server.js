@@ -28,6 +28,77 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+/* ---------- AI 问答代理（DeepSeek） ---------- */
+function loadAiConfig() {
+  try {
+    return Object.assign(
+      { apiKey: '', model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com', mock: false },
+      JSON.parse(fs.readFileSync(path.join(ROOT, 'ai-config.json'), 'utf8'))
+    );
+  } catch (_) { return { apiKey: '', model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com', mock: false }; }
+}
+const aiConfig = loadAiConfig();
+function readBody(req, max) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (c) => { size += c.length; if (size > (max || 4 * 1024 * 1024)) { reject(new Error('body too large')); req.destroy(); return; } chunks.push(c); });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+function sanitizeAiMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages.slice(0, 20).map(m => ({
+    role: (m.role === 'system' || m.role === 'assistant') ? m.role : 'user',
+    content: String(m.content || '').slice(0, 6000)
+  })).filter(m => m.content);
+}
+async function handleAi(req, res) {
+  if (req.method !== 'POST') { sendJson(res, 405, { error: '仅支持 POST' }); return; }
+  let data;
+  try { data = JSON.parse(await readBody(req)); } catch (_) { sendJson(res, 400, { error: '数据格式错误' }); return; }
+  const messages = sanitizeAiMessages(data.messages);
+  if (!messages.length) { sendJson(res, 400, { error: '缺少消息' }); return; }
+  if (aiConfig.mock) {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store' });
+    const last = messages[messages.length - 1].content.slice(0, 40);
+    const text = '（测试模式）你好，我是 AI 助手！我收到了你的问题：' + last + '…… 配置好 DeepSeek API Key 后即可获得真实回答。';
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i >= text.length) { clearInterval(timer); res.write('data: [DONE]\n\n'); res.end(); return; }
+      res.write('data: ' + JSON.stringify({ delta: text[i] }) + '\n\n');
+      i++;
+    }, 12);
+    return;
+  }
+  if (!aiConfig.apiKey) { sendJson(res, 503, { error: 'AI 未配置：请在电脑端 ai-config.json 中填写 DeepSeek API Key 后重启服务器' }); return; }
+  const model = String(data.model || aiConfig.model || 'deepseek-chat').slice(0, 80);
+  const body = JSON.stringify({ model, messages, stream: true, temperature: 0.7 });
+  const upstream = new URL(aiConfig.baseUrl + '/chat/completions');
+  const upReq = https.request(upstream, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + aiConfig.apiKey,
+      'Content-Length': Buffer.byteLength(body)
+    },
+    timeout: 60000
+  }, (up) => {
+    if (up.statusCode !== 200) {
+      let err = '';
+      up.on('data', (c) => { err += c; if (err.length > 2000) up.destroy(); });
+      up.on('end', () => { if (!res.writableEnded) sendJson(res, 502, { error: 'AI 服务返回异常', detail: String(err).slice(0, 500) }); });
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store' });
+    up.pipe(res);
+  });
+  upReq.on('error', () => { if (!res.writableEnded) sendJson(res, 502, { error: 'AI 服务连接失败（请检查电脑网络）' }); });
+  upReq.on('timeout', () => { upReq.destroy(); if (!res.writableEnded) sendJson(res, 504, { error: 'AI 服务超时' }); });
+  upReq.write(body);
+  upReq.end();
+}
+
 function serveStatic(req, res, url) {
   let p = decodeURIComponent(url.pathname);
   if (p === '/') p = '/index.html';
@@ -47,6 +118,7 @@ function serveStatic(req, res, url) {
 const handler = async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch { res.writeHead(400); res.end(); return; }
+  if (url.pathname === '/api/ai') { await handleAi(req, res); return; }
   if (url.pathname.startsWith('/api/')) {
     try {
       const handled = await auth.handle(req, res, url);
