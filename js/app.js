@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.27';
+const APP_VERSION = '4.28';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1228,6 +1228,7 @@ function renderLibrary() {
     subjRoot.appendChild(wrap);
   }
   renderNoteList();
+  updateEmptyState();
 }
 
 function updateEmptyState() {
@@ -2775,6 +2776,8 @@ async function init() {
   }
   if (note) {
     openNote(note.id, active.notebookId, active.subjectId, active.pageIndex || 0);
+  } else if (!Object.keys(lib.notes).length) {
+    createNote();
   } else {
     renderLibrary();
   }
