@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.29';
+const APP_VERSION = '5.0';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -109,6 +109,11 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     const a = state.lib.settings.twoFingerAction || 'undo';
     if (a === 'undo') undo();
     else if (a === 'redo') redo();
+  },
+  onThreeFingerTap: () => {
+    // 三指轻点 = 取消撤销（重做）
+    const act = state.lib.settings.threeFingerAction || 'redo';
+    if (act === 'redo') redo();
   }
 });
 let moveBefore = null;
@@ -711,7 +716,7 @@ function bindUI() {
   $('#btnMore').addEventListener('click', (e) => {
     e.stopPropagation();
     renderSettings();
-    $('#moreMenu').classList.toggle('hidden');
+    $('#settingsPanel').classList.remove('hidden');
   });
   // 录音
   $('#btnRec').addEventListener('click', (e) => {
@@ -748,11 +753,11 @@ function bindUI() {
     toast('已创建笔记本');
   }));
   // 菜单
-  $('#moreMenu').addEventListener('click', (e) => {
+  $('#settingsPanel').addEventListener('click', (e) => {
     const item = e.target.closest('.menu-item[data-action]');
     if (!item) return;
     const act = item.dataset.action;
-    $('#moreMenu').classList.add('hidden');
+    $('#settingsPanel').classList.add('hidden');
     if (act === 'export-note') exportNote();
     if (act === 'export-pdf') exportPdf();
     if (act === 'export-page-png') exportPagePng();
@@ -813,7 +818,6 @@ function bindUI() {
   // 关闭弹层
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#colorPop')) $('#colorPop').classList.add('hidden');
-    if (!e.target.closest('.tb-menu-wrap')) $('#moreMenu').classList.add('hidden');
   });
   // 快捷键
   document.addEventListener('keydown', (e) => {
@@ -1121,6 +1125,22 @@ function renderSettings() {
         renderSettings();
       });
       tfRow.appendChild(b);
+    });
+  }
+  // 三指轻点手势
+  const thrRow = $('#threeFingerRow');
+  if (thrRow) {
+    thrRow.innerHTML = '';
+    [['redo', '重做'], ['off', '关闭']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.threeFingerAction || 'redo') === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        st.threeFingerAction = v;
+        saveLibrary(state.lib);
+        renderSettings();
+      });
+      thrRow.appendChild(b);
     });
   }
   // 外观主题
@@ -2279,6 +2299,45 @@ function bindV426UI() {
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
   window.addEventListener('pagehide', () => { if (state.lib && state.lib.settings.autoBackup !== false) saveSnapshot(state.lib); });
+  // 设置面板：关闭 / 分类切换
+  const sc = $('#settingsClose'); if (sc) sc.addEventListener('click', () => $('#settingsPanel').classList.add('hidden'));
+  const navEl = document.querySelector('.settings-nav');
+  if (navEl) navEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.settings-nav-item');
+    if (!b) return;
+    document.querySelectorAll('.settings-nav-item').forEach(x => x.classList.toggle('active', x === b));
+    document.querySelectorAll('.settings-sec').forEach(x => x.classList.toggle('active', x.id === 'sec-' + b.dataset.sec));
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#settingsPanel') && !$('#settingsPanel').classList.contains('hidden')) $('#settingsPanel').classList.add('hidden'); });
+  // 手指在纸张左右边缘水平滑动翻页
+  const ph = $('#paperHolder');
+  if (ph) {
+    let swipe = null;
+    ph.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      const r = ph.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      if (x < r.width * 0.12 || x > r.width * 0.88) swipe = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, moved: false };
+    }, true);
+    ph.addEventListener('pointermove', (e) => {
+      if (!swipe || swipe.id !== e.pointerId) return;
+      swipe.dx = e.clientX - swipe.x0;
+      swipe.dy = e.clientY - swipe.y0;
+      if (Math.abs(swipe.dx) > 26 && Math.abs(swipe.dx) > Math.abs(swipe.dy) * 1.2) swipe.moved = true;
+    }, true);
+    ph.addEventListener('pointerup', (e) => {
+      if (!swipe || swipe.id !== e.pointerId) return;
+      const s = swipe;
+      swipe = null;
+      if (engine.pointers && engine.pointers.size > 1) return;
+      if (s.moved && Math.abs(s.dx) > 70) {
+        e.preventDefault();
+        if (engine.currentStroke) { engine.currentStroke = null; engine.invalidateRaster(); }
+        if (s.dx < 0) switchPage(state.pageIndex + 1); else switchPage(state.pageIndex - 1);
+      }
+    }, true);
+    ph.addEventListener('pointercancel', () => { swipe = null; }, true);
+  }
 }
 /* ---------------- 弹窗 ---------------- */
 function toast(msg) {
@@ -2818,6 +2877,8 @@ async function init() {
   engine.setPage(currentPage());
   engine.fitView();
   engine.invalidateRaster();
+  requestAnimationFrame(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); });
+  setTimeout(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); }, 150);
   registerSW();
   scheduleSnapshot(true);
 

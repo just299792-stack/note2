@@ -7,7 +7,7 @@
 export const PAGE_W = 816;      // 逻辑页面宽 (pt)
 export const PAGE_H = 1056;     // 逻辑页面高 (pt)
 const RENDER_SCALE = 2;         // 页面光栅超采样
-const MIN_DIST = 1.1;           // 点抽稀最小距离(世界px)
+const MIN_DIST = 0.7;           // 点抽稀最小距离(世界px)
 const LINE_H = 48;              // 横线行距(世界px)，荧光笔对齐用
 
 const PAPER_INFO = {
@@ -487,13 +487,13 @@ export class DrawingEngine {
   }
 
   onPointerDown(e) {
-    if (this.pointers.size >= 2) return;
+    if (this.pointers.size >= 3) return;
     if (this.playbackLock) return;
     try { this.canvas.setPointerCapture?.(e.pointerId); } catch (_) {}
     const L = this.local(e);
-    this.pointers.set(e.pointerId, { id: e.pointerId, x: L.x, y: L.y });
+    this.pointers.set(e.pointerId, { id: e.pointerId, x: L.x, y: L.y, t: Date.now() });
 
-    if (this.pointers.size === 2) { this.beginGesture(); return; }
+    if (this.pointers.size >= 2) { this.beginGesture(); return; }
 
     const settings = this.cb.getSettings();
     if (e.pointerType === 'mouse' && e.button === 2) { this.panning = true; return; }
@@ -545,7 +545,7 @@ export class DrawingEngine {
     const Lp = this.local(e);
     const nx = Lp.x, ny = Lp.y;
 
-    if (this.pointers.size === 2) { p.x = nx; p.y = ny; this.updateGesture(); return; }
+    if (this.pointers.size >= 2) { p.x = nx; p.y = ny; this.updateGesture(); return; }
     if (this.gesture) return;
 
     if (this.panning) {
@@ -562,10 +562,20 @@ export class DrawingEngine {
     if (pen) {
       const last = pen.points[pen.points.length - 1];
       const rawP = this.pressure(e);
-      const filtP = rawP * 0.4 + (last.p || 1) * 0.6;   // 压力低通滤波，去抖动
+      const filtP = rawP * 0.55 + (last.p || 1) * 0.45;   // 压力低通滤波，去抖动
       const np = this.snapPoint(w, pen.tool, filtP);
-      if (Math.hypot(np.x - last.x, np.y - last.y) >= MIN_DIST) {
-        pen.points.push(np);
+      const seg = Math.hypot(np.x - last.x, np.y - last.y);
+      if (seg >= MIN_DIST) {
+        if (seg > 12) {
+          // 快速滑动补点，防止断墨
+          const steps = Math.max(2, Math.floor(seg / 4));
+          for (let k = 1; k <= steps; k++) {
+            const t = k / steps;
+            pen.points.push(this.snapPoint({ x: last.x + (np.x - last.x) * t, y: last.y + (np.y - last.y) * t }, pen.tool, filtP));
+          }
+        } else {
+          pen.points.push(np);
+        }
         this.lastMoveTs = Date.now();
         this.dirtyView = true;
         this.armDwell();
@@ -608,10 +618,11 @@ export class DrawingEngine {
       const g = this.gesture;
       if (this.pointers.size === 0) {
         this.gesture = null;
-        // 双指轻点 = 撤销
-        if (Date.now() - g.startTime < 320 && g.maxMove < 24) {
-          if (this.cb.onTwoFingerTap) this.cb.onTwoFingerTap();
-        }
+        const dt = Date.now() - g.startTime;
+        // 轻点判定（防误触）：时间短、几乎不动、双指同时落下、间距足够、且落笔前没有在书写
+        const tap = dt < 320 && g.maxMove < 12 && g.tGap < 180 && g.dist > 40 && !g.hadStroke;
+        if (tap && g.count >= 3 && this.cb.onThreeFingerTap) this.cb.onThreeFingerTap();
+        else if (tap && g.count === 2 && this.cb.onTwoFingerTap) this.cb.onTwoFingerTap();
       }
       return;
     }
@@ -687,14 +698,19 @@ export class DrawingEngine {
 
   /* -------- 双指手势 -------- */
   beginGesture() {
-    const [a, b] = [...this.pointers.values()];
+    const pts = [...this.pointers.values()];
+    const a = pts[0], b = pts[1] || a;
     this.gesture = {
+      count: pts.length,
+      tGap: pts.length >= 2 ? Math.abs(a.t - b.t) : 0,
       dist: Math.hypot(a.x - b.x, a.y - b.y),
       mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
       scale: this.scale, ox: this.ox, oy: this.oy,
       startTime: Date.now(),
       startA: { x: a.x, y: a.y }, startB: { x: b.x, y: b.y },
-      maxMove: 0
+      maxMove: 0,
+      startPts: pts.map(pt => ({ x: pt.x, y: pt.y })),
+      hadStroke: !!this.currentStroke
     };
     this.clearDwell();
     this.currentStroke = null; this.lassoPath = null; this.curShape = null; this.textTap = null;
@@ -708,10 +724,11 @@ export class DrawingEngine {
     const dist = Math.hypot(a.x - b.x, a.y - b.y);
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const g = this.gesture;
-    const move = Math.max(
-      Math.hypot(a.x - g.startA.x, a.y - g.startA.y),
-      Math.hypot(b.x - g.startB.x, b.y - g.startB.y)
-    );
+    let move = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const sp = g.startPts && g.startPts[i] ? g.startPts[i] : { x: pts[i].x, y: pts[i].y };
+      move = Math.max(move, Math.hypot(pts[i].x - sp.x, pts[i].y - sp.y));
+    }
     if (move > g.maxMove) g.maxMove = move;
     if (dist > 0) {
       const ns = Math.max(0.25, Math.min(4, g.scale * (dist / g.dist)));
