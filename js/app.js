@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.3';
+const APP_VERSION = '5.4';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -114,6 +114,14 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     // 三指轻点 = 取消撤销（重做）
     const act = state.lib.settings.threeFingerAction || 'redo';
     if (act === 'redo') redo();
+  },
+  onTwoFingerScroll: (dy) => {
+    // 双指上下滑动 = 连续滚动纸张
+    const ph = $('#paperHolder');
+    if (!ph) return false;
+    const before = ph.scrollTop;
+    ph.scrollTop -= dy;
+    return ph.scrollTop !== before;
   }
 });
 let moveBefore = null;
@@ -383,6 +391,7 @@ function openNote(noteId, notebookId, subjectId, pageIndex) {
   engine.invalidateRaster();
   renderLibrary();
   renderPages();
+  renderPaperStack();
   updatePageNav();
   refreshTitleMeta();
   updatePaperUI();
@@ -410,23 +419,16 @@ function pageFade() {
 function switchPage(i) {
   const note = currentNote();
   if (!note || i < 0 || i >= note.pages.length) return;
-  const dir = i > state.pageIndex ? 'right' : 'left';
   state.pageIndex = i;
   engine.setPage(currentPage());
   pageFade();
   engine.fitView();
   engine.invalidateRaster();
   renderPages();
+  renderPaperStack();
   updatePageNav();
   state.lib.active.pageIndex = i;
   saveSoon();
-  const ph = document.querySelector('.paper-holder');
-  if (ph) {
-    ph.classList.remove('turning-right', 'turning-left');
-    void ph.offsetWidth;
-    ph.classList.add('turning-' + dir);
-    setTimeout(() => ph.classList.remove('turning-right', 'turning-left'), 280);
-  }
 }
 
 function applyPagesChange() {
@@ -434,6 +436,7 @@ function applyPagesChange() {
   engine.fitView();
   engine.invalidateRaster();
   renderPages();
+  renderPaperStack();
   updatePageNav();
   saveSoon(true);
 }
@@ -1777,6 +1780,60 @@ function refreshThumbs() {
   });
 }
 
+/* 连续纸张视图：所有页纵向排成一列，当前页可书写，相邻页渲染，其余占位 */
+let _vcCache = null, _tlCache = null;
+function renderPaperStack() {
+  const note = currentNote();
+  const holder = $('#paperHolder');
+  if (!holder) return;
+  if (!_vcCache) _vcCache = document.getElementById('viewCanvas');
+  if (!_tlCache) _tlCache = document.getElementById('textLayer');
+  let stack = $('#paperStack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'paperStack';
+    stack.className = 'paper-stack';
+    holder.insertBefore(stack, holder.firstChild);
+  }
+  stack.innerHTML = '';
+  if (!note) { stack.style.display = 'none'; return; }
+  stack.style.display = 'flex';
+  note.pages.forEach((page, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'paper-slot' + (i === state.pageIndex ? ' current' : '');
+    slot.dataset.i = String(i);
+    if (i === state.pageIndex) {
+      if (_vcCache && _vcCache.parentElement !== slot) slot.appendChild(_vcCache);
+      if (_tlCache && _tlCache.parentElement !== slot) slot.appendChild(_tlCache);
+      const num = document.createElement('span');
+      num.className = 'paper-slot-num';
+      num.textContent = i + 1;
+      slot.appendChild(num);
+    } else {
+      if (Math.abs(i - state.pageIndex) <= 2) {
+        const cv = document.createElement('canvas');
+        renderPageToCanvas(cv, page, note.paper, 640, FONT);
+        slot.appendChild(cv);
+      } else {
+        slot.classList.add('placeholder');
+        const num = document.createElement('span');
+        num.className = 'paper-slot-num';
+        num.textContent = i + 1;
+        slot.appendChild(num);
+      }
+      slot.addEventListener('click', () => { if (i !== state.pageIndex && currentNote()) switchPage(i); });
+    }
+    stack.appendChild(slot);
+  });
+  requestAnimationFrame(() => {
+    const cur = stack.querySelector('.paper-slot.current');
+    if (cur) {
+      const target = cur.offsetTop - holder.clientHeight / 2 + cur.clientHeight / 2;
+      holder.scrollTop = Math.max(0, target);
+    }
+  });
+}
+
 function renderPages() {
   const note = currentNote();
   const list = $('#pagesList');
@@ -2317,6 +2374,28 @@ function bindV426UI() {
     document.querySelectorAll('.settings-sec').forEach(x => x.classList.toggle('active', x.id === 'sec-' + b.dataset.sec));
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#settingsPanel') && !$('#settingsPanel').classList.contains('hidden')) $('#settingsPanel').classList.add('hidden'); });
+  // 连续纸张：滚动停止后吸附最近的一页为当前页
+  const pHolder = $('#paperHolder');
+  if (pHolder) {
+    let st = null;
+    pHolder.addEventListener('scroll', () => {
+      clearTimeout(st);
+      st = setTimeout(() => {
+        const stack = $('#paperStack');
+        if (!stack || !currentNote()) return;
+        const slots = [...stack.querySelectorAll('.paper-slot')];
+        if (!slots.length) return;
+        const mid = pHolder.scrollTop + pHolder.clientHeight / 2;
+        let best = slots[0], bd = Infinity;
+        for (const s of slots) {
+          const d = Math.abs((s.offsetTop + s.clientHeight / 2) - mid);
+          if (d < bd) { bd = d; best = s; }
+        }
+        const idx = Number(best.dataset.i);
+        if (idx !== state.pageIndex) switchPage(idx);
+      }, 260);
+    });
+  }
   // 手指在纸张左右边缘水平滑动翻页
   const ph = $('#paperHolder');
   if (ph) {

@@ -705,6 +705,7 @@ export class DrawingEngine {
       tGap: pts.length >= 2 ? Math.abs(a.t - b.t) : 0,
       dist: Math.hypot(a.x - b.x, a.y - b.y),
       mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      startMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
       scale: this.scale, ox: this.ox, oy: this.oy,
       startTime: Date.now(),
       startA: { x: a.x, y: a.y }, startB: { x: b.x, y: b.y },
@@ -730,7 +731,13 @@ export class DrawingEngine {
       move = Math.max(move, Math.hypot(pts[i].x - sp.x, pts[i].y - sp.y));
     }
     if (move > g.maxMove) g.maxMove = move;
-    if (dist > 0) {
+    const midDy = mid.y - g.startMid.y;
+    const midDx = mid.x - g.startMid.x;
+    let scrolled = false;
+    if (Math.abs(midDy) > Math.abs(midDx) && this.cb.onTwoFingerScroll) {
+      scrolled = this.cb.onTwoFingerScroll(midDy);
+    }
+    if (dist > 0 && !scrolled) {
       const ns = Math.max(0.25, Math.min(4, g.scale * (dist / g.dist)));
       this.scale = ns;
       const wmx = (g.mid.x - g.ox) / g.scale;
