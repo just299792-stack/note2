@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '4.28';
+const APP_VERSION = '4.29';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -470,18 +470,45 @@ function clearPage() {
   });
 }
 
-function deletePage() {
+function deletePageAt(i) {
   const note = currentNote();
   if (!note || note.pages.length <= 1) { toast('至少保留一页'); return; }
-  confirmModal('删除当前页？', '这一页上的所有内容都会被删除，且无法恢复。', '删除', true, () => {
+  confirmModal('删除第 ' + (i + 1) + ' 页？', '这一页上的所有内容都会被删除，且无法恢复。', '删除', true, () => {
     const before = note.pages.slice();
-    note.pages.splice(state.pageIndex, 1);
+    note.pages.splice(i, 1);
     const after = note.pages.slice();
     pushHistory('删除页面',
       () => { note.pages = before; afterPageArrayRestore(); },
       () => { note.pages = after; afterPageArrayRestore(); });
-    state.pageIndex = Math.max(0, state.pageIndex - 1);
+    if (state.pageIndex >= i) state.pageIndex = Math.max(0, state.pageIndex - 1);
     afterPageArrayRestore();
+  });
+}
+
+function deletePage() { deletePageAt(state.pageIndex); }
+
+function clearBlankPages() {
+  const note = currentNote();
+  if (!note) return;
+  const blank = [];
+  note.pages.forEach((p, idx) => {
+    if (!p.strokes.length && !p.texts.length && !(p.images && p.images.length) && !p.bg) blank.push(idx);
+  });
+  if (!blank.length) { toast('没有空白页'); return; }
+  if (note.pages.length - blank.length < 1) { toast('至少保留一页'); return; }
+  confirmModal('删除 ' + blank.length + ' 个空白页？', '空白页（无笔迹、文字、图片或背景）将被删除，且无法恢复。', '删除', true, () => {
+    const before = note.pages.slice();
+    const delSet = new Set(blank);
+    note.pages = note.pages.filter((p, idx) => !delSet.has(idx));
+    const after = note.pages.slice();
+    pushHistory('删除空白页',
+      () => { note.pages = before; afterPageArrayRestore(); },
+      () => { note.pages = after; afterPageArrayRestore(); });
+    let removedBefore = 0;
+    for (const idx of blank) if (idx < state.pageIndex) removedBefore++;
+    state.pageIndex = Math.max(0, Math.min(state.pageIndex - removedBefore, note.pages.length - 1));
+    afterPageArrayRestore();
+    toast('已删除 ' + blank.length + ' 个空白页');
   });
 }
 
@@ -741,6 +768,7 @@ function bindUI() {
     if (act === 'duplicate-page') duplicatePage();
     if (act === 'copy-page-to') copyPageTo();
     if (act === 'delete-page') deletePage();
+    if (act === 'clear-blank-pages') clearBlankPages();
     if (act === 'clear-page') clearPage();
     if (act === 'account') { if (state.auth) logout(true); else openAuthModal('login'); }
     if (act === 'logout') logout(true);
@@ -1737,6 +1765,12 @@ function renderPages() {
     num.textContent = i + 1;
     btn.appendChild(num);
     if (note.pages.length > 1) {
+      const d = document.createElement('button');
+      d.className = 'pt-del';
+      d.title = '删除此页';
+      d.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg>';
+      d.addEventListener('click', (e) => { e.stopPropagation(); deletePageAt(i); });
+      btn.appendChild(d);
       if (i > 0) {
         const mL = document.createElement('button');
         mL.className = 'pt-move left';
@@ -2794,7 +2828,8 @@ async function init() {
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
     renderFavorites, insertImage, importPdf, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
-    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection };
+    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection,
+    deletePageAt, clearBlankPages };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }

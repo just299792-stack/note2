@@ -228,7 +228,7 @@ button:disabled { opacity: .35; pointer-events: none; }
 .page-thumb:active { transform: scale(.97); }
 .page-thumb canvas { display: block; width: 100%; height: auto; }
 .page-thumb .pt-num {
-  position: absolute; top: 4px; right: 5px; font-size: 10px; font-weight: 700;
+  position: absolute; bottom: 4px; left: 5px; font-size: 10px; font-weight: 700;
   color: #fff; background: rgba(15,23,42,.55); padding: 1px 6px; border-radius: 999px;
 }
 
@@ -829,3 +829,13 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 .pres-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .pres-row input.pres-name { flex: 1; min-width: 0; }
 .pres-chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); flex: none; }
+
+.page-thumb .pt-del {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+  border-radius: 50%; background: rgba(15,23,42,.55); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  border: none; padding: 0; opacity: 0; transition: opacity .15s, background .15s; z-index: 3;
+}
+.page-thumb:hover .pt-del, .pt-del:focus { opacity: 1; }
+.page-thumb .pt-del:hover { background: #dc2626; }
+.page-thumb .pt-del .ic { width: 11px; height: 11px; stroke-width: 2.4; }
