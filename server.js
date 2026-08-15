@@ -54,6 +54,7 @@ function sanitizeAiMessages(messages) {
   })).filter(m => m.content);
 }
 async function handleAi(req, res) {
+  if (req.method === 'GET') { sendJson(res, 200, { name: aiConfig.name || 'DeepSeek', model: aiConfig.model || 'deepseek-chat' }); return; }
   if (req.method !== 'POST') { sendJson(res, 405, { error: '仅支持 POST' }); return; }
   let data;
   try { data = JSON.parse(await readBody(req)); } catch (_) { sendJson(res, 400, { error: '数据格式错误' }); return; }
@@ -118,7 +119,7 @@ function serveStatic(req, res, url) {
 const handler = async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch { res.writeHead(400); res.end(); return; }
-  if (url.pathname === '/api/ai') { await handleAi(req, res); return; }
+  if (url.pathname.startsWith('/api/ai')) { await handleAi(req, res); return; }
   if (url.pathname.startsWith('/api/')) {
     try {
       const handled = await auth.handle(req, res, url);

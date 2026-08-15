@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.4';
+const APP_VERSION = '5.5';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2458,6 +2458,12 @@ function toggleAIPanel() {
     if (!$('#aiMsgs').children.length) {
       appendAIMsg('assistant', '你好，我是 AI 助手。可以问我学习问题，也可以结合当前笔记提问。');
     }
+    fetch('/api/ai/model').then(r => r.ok ? r.json() : null).then(d => {
+      if (d && d.name) {
+        const t = $('#aiTitle'); if (t) t.textContent = d.name;
+        const m = $('#aiModel'); if (m && d.model) m.textContent = d.model;
+      }
+    }).catch(() => {});
     setTimeout(() => $('#aiInput').focus(), 120);
   }
 }
