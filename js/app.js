@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.2';
+const APP_VERSION = '5.3';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2431,7 +2431,10 @@ async function sendAIMessage() {
         if (payload === '[DONE]') continue;
         try {
           const obj = JSON.parse(payload);
-          if (obj.delta) { answer += obj.delta; bubble.textContent = answer; $('#aiMsgs').scrollTop = $('#aiMsgs').scrollHeight; }
+          let delta = '';
+          if (typeof obj.delta === 'string') delta = obj.delta;
+          else if (obj.choices && obj.choices[0] && obj.choices[0].delta && typeof obj.choices[0].delta.content === 'string') delta = obj.choices[0].delta.content;
+          if (delta) { answer += delta; bubble.textContent = answer; $('#aiMsgs').scrollTop = $('#aiMsgs').scrollHeight; }
         } catch (_) {}
       }
     }
