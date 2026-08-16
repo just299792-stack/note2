@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.51';
+const APP_VERSION = '5.52';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -39,7 +39,7 @@ const state = {
   collapsedSubjects: new Set(),
   auth: null,
   authAvailable: false,
-  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [], speed: 1 },
+  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [], animTimers: [], speed: 1 },
   recSupported: !!(navigator.mediaDevices && window.MediaRecorder),
   searchQuery: '',
   prevTool: null,
@@ -4578,7 +4578,31 @@ async function playRecording(item, startSec) {
         const c = engine.page;
         if (!c) return;
         if (ev.type === 'stroke') {
-          if (!c.strokes.some(s => s.id === ev.data.id)) c.strokes.push(JSON.parse(JSON.stringify(ev.data)));
+          if (!c.strokes.some(s => s.id === ev.data.id)) {
+            const st = JSON.parse(JSON.stringify(ev.data));
+            const all = st.points || [];
+            if (all.length >= 2) {
+              st.points = [];
+              c.strokes.push(st);
+              const step = Math.max(1, Math.ceil(all.length / 30));
+              let i = 0;
+              const anim = setInterval(() => {
+                if (!state.rec.playback) {
+                  st.points = all.slice();
+                  if (engine.page === c) engine.invalidateRaster();
+                  clearInterval(anim);
+                  return;
+                }
+                i = Math.min(all.length, i + step);
+                st.points = all.slice(0, i);
+                if (engine.page === c) engine.invalidateRaster();
+                if (i >= all.length) clearInterval(anim);
+              }, 24);
+              state.rec.animTimers.push(anim);
+            } else {
+              c.strokes.push(st);
+            }
+          }
         } else if (ev.type === 'erase') {
           c.strokes = c.strokes.filter(s => !ev.data.ids.includes(s.id));
         }
