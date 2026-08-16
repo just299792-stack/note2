@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.58';
+const APP_VERSION = '5.59';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -961,6 +961,7 @@ function bindUI() {
     if (act === 'export-note') exportNote();
     if (act === 'export-pdf') exportPdf();
     if (act === 'export-page-png') exportPagePng();
+    if (act === 'export-longpng') exportNoteLongImage();
     if (act === 'export-library') exportLibrary();
     if (act === 'import') $('#fileInput').click();
     if (act === 'import-pdf') $('#pdfInput').click();
@@ -2565,7 +2566,36 @@ async function exportPagePng() {
   renderPageToCanvas(cv, currentPage(), note.paper, 1224, currentFont(), note.pageW, note.pageH);
   const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
   if (!blob) { toast('导出失败'); return; }
-  await shareOrDownload(blob, safeName(note.title) + '-第' + (state.pageIndex + 1) + '页.png');
+  await shareOrDownload(blob, safeName(note.title) + '-p' + (state.pageIndex + 1) + '.png');
+}
+async function exportNoteLongImage() {
+  const note = currentNote();
+  if (!note) return;
+  if (note.pages.length > 12) { toast('页数较多，建议用「导出为 PDF」'); return; }
+  const W = 1000;
+  const pH = Math.round(W / (pageW() / pageH()));
+  const gap = 26;
+  const H = note.pages.length * pH + (note.pages.length - 1) * gap + 40;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#e7eaf0';
+  ctx.fillRect(0, 0, W, H);
+  note.pages.forEach((p, i) => {
+    const pc = document.createElement('canvas');
+    renderPageToCanvas(pc, p, note.paper, W, currentFont(), note.pageW, note.pageH);
+    const y = 20 + i * (pH + gap);
+    ctx.save();
+    ctx.shadowColor = 'rgba(15,23,42,.25)';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(6, y - 6, W - 12, pH + 12);
+    ctx.restore();
+    ctx.drawImage(pc, 0, y);
+  });
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  if (!blob) { toast('导出失败'); return; }
+  await shareOrDownload(blob, safeName(note.title) + '-zhengpian.png');
 }
 
 function withPdfHeader(cv, title, idx, total) {
@@ -4835,7 +4865,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf, exportNoteMarkdown };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
