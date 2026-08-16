@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.54';
+const APP_VERSION = '5.55';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1533,6 +1533,7 @@ function renderSettings() {
   const oFav = $('#optFavBar'); if (oFav) oFav.checked = st.favoritesBar !== false;
   const oBak = $('#optAutoBackup'); if (oBak) oBak.checked = st.autoBackup !== false;
   const oMarkup = $('#optMarkup'); if (oMarkup) oMarkup.checked = st.markup === true;
+  const aiP = $('#aiPromptInput'); if (aiP) aiP.value = st.aiPrompt || '';
   const av = $('#appVersion'); if (av) av.textContent = APP_VERSION;
 }
 
@@ -3347,6 +3348,7 @@ function bindV426UI() {
   const oFav = $('#optFavBar'); if (oFav) oFav.addEventListener('change', (e) => { state.lib.settings.favoritesBar = e.target.checked; saveLibrary(state.lib); renderFavorites(); });
   const oBak = $('#optAutoBackup'); if (oBak) oBak.addEventListener('change', (e) => { state.lib.settings.autoBackup = e.target.checked; saveLibrary(state.lib); if (e.target.checked) scheduleSnapshot(true); });
   const oMarkup = $('#optMarkup'); if (oMarkup) oMarkup.addEventListener('change', (e) => toggleMarkupMode(e.target.checked));
+  const aiP = $('#aiPromptInput'); if (aiP) aiP.addEventListener('input', (e) => { state.lib.settings.aiPrompt = e.target.value; saveLibrary(state.lib); });
   const pPrev = $('#presPrev'); if (pPrev) pPrev.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex - 1); renderPresPage(); } });
   const pNext = $('#presNext'); if (pNext) pNext.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex + 1); renderPresPage(); } });
   const pClose = $('#presClose'); if (pClose) pClose.addEventListener('click', exitPresent);
@@ -4070,8 +4072,9 @@ async function sendAIMessage() {
   appendAIMsg('user', text);
   input.value = '';
   const ctx = buildAIContext();
+  const custom = (state.lib.settings.aiPrompt || '').trim();
   const messages = [
-    { role: 'system', content: '你是「笔记」应用里的 AI 学习助手，用简洁、有条理的中文回答。\n' + ctx },
+    { role: 'system', content: (custom ? custom + '\n\n' : '') + '你是「笔记」应用里的 AI 学习助手，用简洁、有条理的中文回答。\n' + ctx },
     ...aiHistory,
     { role: 'user', content: text }
   ];
