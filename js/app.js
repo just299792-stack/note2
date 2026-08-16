@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.6';
+const APP_VERSION = '5.7';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1180,6 +1180,7 @@ function renderSettings() {
   }
   const oFav = $('#optFavBar'); if (oFav) oFav.checked = st.favoritesBar !== false;
   const oBak = $('#optAutoBackup'); if (oBak) oBak.checked = st.autoBackup !== false;
+  const av = $('#appVersion'); if (av) av.textContent = APP_VERSION;
 }
 
 function setPaper(style, color) {
