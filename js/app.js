@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.98';
+const APP_VERSION = '5.99';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3769,7 +3769,7 @@ function bindV426UI() {
     document.querySelectorAll('.settings-nav-item').forEach(x => x.classList.toggle('active', x === b));
     document.querySelectorAll('.settings-sec').forEach(x => x.classList.toggle('active', x.id === 'sec-' + b.dataset.sec));
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#modalRoot') && $('#modalRoot').children.length) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#modalRoot') && $('#modalRoot').children.length) { closeModal(); return; } if (engine && engine.getSelectionIds().length) { engine.clearSelection(); } } });;
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#settingsPanel') && !$('#settingsPanel').classList.contains('hidden')) $('#settingsPanel').classList.add('hidden'); });
   // 连续纸张：滚动停止后吸附最近的一页为当前页
   const pHolder = $('#paperHolder');
