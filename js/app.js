@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.84';
+const APP_VERSION = '5.85';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3698,8 +3698,8 @@ function bindV426UI() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
   document.addEventListener('keydown', (e) => {
     if ($('#presMode') && !$('#presMode').classList.contains('hidden')) {
-      if (e.key === 'ArrowLeft') { switchPage(state.pageIndex - 1); renderPresPage(); }
-      else if (e.key === 'ArrowRight') { switchPage(state.pageIndex + 1); renderPresPage(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); switchPage(state.pageIndex - 1); renderPresPage(); }
+      else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); switchPage(state.pageIndex + 1); renderPresPage(); }
     }
   });
   window.addEventListener('pagehide', () => { if (state.lib && state.lib.settings.autoBackup !== false) saveSnapshot(state.lib); });
