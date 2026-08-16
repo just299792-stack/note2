@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.14';
+const APP_VERSION = '5.15';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -811,6 +811,8 @@ function bindUI() {
     if (act === 'templates') openTemplateManager();
     if (act === 'new-from-template') openTemplateManager();
     if (act === 'read-aloud') toggleReadAloud();
+    if (act === 'find-in-note') findInNote();
+    if (act === 'outline') outlineNote();
     if (act === 'export-text') exportNoteText();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
@@ -888,6 +890,7 @@ function bindUI() {
     if (!(e.metaKey || e.ctrlKey)) return;
     const k = e.key.toLowerCase();
     if (k === 'e' && !e.shiftKey) { e.preventDefault(); exportNote(); }
+    else if (k === 'f') { e.preventDefault(); findInNote(); }
     else if (k === 'p' && e.shiftKey) { e.preventDefault(); exportPagePng(); }
     else if (k === 'p') { e.preventDefault(); exportPdf(); }
   });
@@ -1349,7 +1352,7 @@ function renderLibrary() {
         main.innerHTML = `<span class="nb-icon"></span><span class="nb-name"></span>`;
         const hue = (nbi++ * 47) % 360;
         main.querySelector('.nb-icon').style.background = nb.color || `linear-gradient(135deg, hsl(${hue},78%,60%), hsl(${(hue + 45) % 360},72%,52%))`;
-        main.querySelector('.nb-icon').textContent = nb.name.slice(0, 1);
+        main.querySelector('.nb-icon').textContent = nb.emoji || nb.name.slice(0, 1);
         main.querySelector('.nb-name').textContent = nb.name;
         main.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -1572,6 +1575,7 @@ function noteActions(note, anchor) {
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
     <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
+    <button class="menu-item" data-act="emoji"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h16"/></svg>封面符号</button>
     <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
     <button class="menu-item" data-act="multi"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h4M4 12h4M4 18h4M11 6h9M11 12h9M11 18h9"/></svg>多选</button>
     <button class="menu-item" data-act="copy"><svg viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制笔记</button>
@@ -1694,6 +1698,7 @@ function notebookActions(nb, anchor) {
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
     <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
+    <button class="menu-item" data-act="emoji"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h16"/></svg>封面符号</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -1702,6 +1707,7 @@ function notebookActions(nb, anchor) {
   document.body.appendChild(menu);
   menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNotebook(nb); });
   menu.querySelector('[data-act="color"]').addEventListener('click', () => { menu.remove(); notebookColor(nb); });
+  menu.querySelector('[data-act="emoji"]').addEventListener('click', () => { menu.remove(); noteEmoji(nb); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNotebookConfirm(nb); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -1852,6 +1858,7 @@ function subjectActions(subj, anchor) {
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
     <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
+    <button class="menu-item" data-act="emoji"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h16"/></svg>封面符号</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -2696,6 +2703,67 @@ async function exportNoteText() {
   const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
   await shareOrDownload(blob, safeName(note.title) + '.txt');
 }
+/* ---------------- 页内查找 / 大纲 / 封面符号（Notability 检索体验） ---------------- */
+function findInNote() {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  promptModal('在笔记中查找', '', '查找内容', '查找', (q) => {
+    if (!q) return;
+    const ql = q.toLowerCase();
+    const hits = [];
+    note.pages.forEach((p, i) => {
+      (p.texts || []).forEach(t => {
+        const tx = (t.text || '').toLowerCase();
+        if (tx.includes(ql)) {
+          const idx = tx.indexOf(ql);
+          hits.push({ page: i, snippet: t.text.slice(Math.max(0, idx - 10), idx + q.length + 16) });
+        }
+      });
+    });
+    if (!hits.length) { toast('未找到相关内容'); return; }
+    const body = hits.map(h => `<div class="find-row" data-p="${h.page}"><span class="find-page">第 ${h.page + 1} 页</span><span class="find-snippet">…${escapeHtml(h.snippet)}…</span></div>`).join('');
+    modalShell('在笔记中查找 · ' + hits.length + ' 处', body, [{ label: '关闭' }]);
+    const mask = document.querySelector('#modalRoot .modal-mask');
+    if (mask) mask.querySelectorAll('.find-row').forEach(r => r.addEventListener('click', () => {
+      closeModal();
+      switchPage(Number(r.dataset.p));
+    }));
+  });
+}
+
+function outlineNote() {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  const items = [];
+  note.pages.forEach((p, i) => {
+    (p.texts || []).forEach(t => {
+      const len = (t.text || '').trim();
+      if (len && (t.fontSize || 0) >= 26) items.push({ page: i, text: len.slice(0, 40), size: t.fontSize });
+    });
+  });
+  if (!items.length) { toast('没有检测到标题（字号较大的文字）'); return; }
+  const body = items.map(it => `<div class="outline-row" data-p="${it.page}"><span class="ol-dot"></span><span class="ol-text">${escapeHtml(it.text)}</span><span class="ol-page">第 ${it.page + 1} 页</span></div>`).join('');
+  modalShell('大纲', body, [{ label: '关闭' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (mask) mask.querySelectorAll('.outline-row').forEach(r => r.addEventListener('click', () => {
+    closeModal();
+    switchPage(Number(r.dataset.p));
+  }));
+}
+
+function noteEmoji(nb) {
+  const emojis = ['📘', '📗', '📕', '📙', '📓', '📔', '📒', '📚', '✏️', '📝', '🗂️', '⭐', '❤️', '🔥', '💡', '🎓'];
+  const body = `<div class="nb-emojis">${emojis.map(e => `<button class="nb-emoji" data-e="${e}">${e}</button>`).join('')}</div>`;
+  modalShell('封面符号', body, [{ label: '取消' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('.nb-emoji').forEach(b => b.addEventListener('click', () => {
+    nb.emoji = b.dataset.e;
+    saveLibrary(state.lib);
+    renderLibrary();
+    toast('已设置封面符号');
+  }));
+}
 /* ---------------- 模板中心（Notability Templates） ---------------- */
 function saveCurrentAsTemplate(name) {
   const note = currentNote();
@@ -3478,7 +3546,7 @@ async function init() {
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
     toggleReadAloud, exportNoteText, notebookColor,
-    renderLibrary, setSpacing };
+    renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
