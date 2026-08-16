@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.24';
+const APP_VERSION = '5.25';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -45,6 +45,7 @@ const state = {
   prevTool: null,
   noteSort: 'updated',
   tagFilter: null,
+  showRecent: false,
   saving: false,
   multi: { on: false, selected: new Set() }
 };
@@ -792,6 +793,12 @@ function bindUI() {
   $('#recToggle').addEventListener('click', toggleRecording);
   $('#btnRec').classList.toggle('hidden', !state.recSupported);
   $('#btnNewNote').addEventListener('click', openNewNoteMenu);
+  const rcBtn = $('#btnRecent');
+  if (rcBtn) rcBtn.addEventListener('click', () => {
+    state.showRecent = !state.showRecent;
+    rcBtn.classList.toggle('active', state.showRecent);
+    renderNoteList();
+  });
   const nsEl = $('#noteSearch');
   if (nsEl) nsEl.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderNoteList(); });
   if (nsEl) nsEl.addEventListener('keydown', (e) => {
@@ -1560,11 +1567,63 @@ function renderTagFilter() {
   TAG_COLORS.forEach(c => mk(c, c, false));
 }
 
+function renderRecentNotes() {
+  const root = $('#noteList');
+  root.innerHTML = '';
+  const all = [];
+  for (const s of state.lib.subjects) for (const nb of s.notebooks) for (const id of nb.noteIds) {
+    const n = state.lib.notes[id];
+    if (n) all.push({ note: n, subject: s, notebook: nb });
+  }
+  all.sort((a, b) => (b.note.updatedAt || 0) - (a.note.updatedAt || 0));
+  const recent = all.slice(0, 15);
+  if (!recent.length) {
+    const empty = document.createElement('div');
+    empty.className = 'note-item';
+    empty.style.opacity = '.55';
+    empty.textContent = '还没有笔记';
+    root.appendChild(empty);
+    return;
+  }
+  const head = document.createElement('div');
+  head.className = 'note-group-head';
+  head.textContent = '最近笔记';
+  root.appendChild(head);
+  recent.forEach(r => {
+    const d = new Date(r.note.updatedAt || r.note.createdAt);
+    const item = document.createElement('div');
+    item.className = 'note-item' + (r.note.id === state.activeNoteId ? ' active' : '');
+    item.innerHTML = '<span class="ni-cover"></span><span class="ni-text"><span class="ni-title"></span><span class="ni-meta"></span></span>';
+    const coverEl = item.querySelector('.ni-cover');
+    coverEl.style.background = paperInfo(r.note.paper.color).bg;
+    if (r.note.pages && r.note.pages[0]) {
+      const cv = document.createElement('canvas');
+      renderPageToCanvas(cv, r.note.pages[0], r.note.paper, 90, currentFont());
+      coverEl.appendChild(cv);
+    }
+    if (r.note.colorTag) {
+      const tag = document.createElement('span');
+      tag.className = 'ni-tag';
+      tag.style.background = r.note.colorTag;
+      item.querySelector('.ni-text').insertBefore(tag, item.querySelector('.ni-title'));
+    }
+    item.querySelector('.ni-title').textContent = r.note.title;
+    item.querySelector('.ni-meta').textContent = r.note.pages.length + ' 页 · ' + r.subject.name + ' / ' + r.notebook.name + ' · ' + (d.getMonth() + 1) + '/' + d.getDate();
+    item.addEventListener('click', () => {
+      openNote(r.note.id, r.notebook.id, r.subject.id);
+      state.showRecent = false;
+      const b = $('#btnRecent'); if (b) b.classList.remove('active');
+    });
+    root.appendChild(item);
+  });
+}
+
 function renderNoteList() {
   const root = $('#noteList');
   root.innerHTML = '';
   const f = findNotebook(state.lib, state.activeNotebookId);
   let notes = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
+  if (state.showRecent) { renderRecentNotes(); return; }
   renderTagFilter();
   if (state.tagFilter) notes = notes.filter(n => n.colorTag === state.tagFilter);
   const q = (state.searchQuery || '').trim().toLowerCase();

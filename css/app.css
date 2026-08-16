@@ -1161,3 +1161,5 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 
 .page-thumb.dragging { opacity: .35; }
 .page-thumb.ghost { opacity: .92; box-shadow: 0 14px 34px rgba(0,0,0,.35); cursor: grabbing; pointer-events: none; }
+
+#btnRecent.active { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
