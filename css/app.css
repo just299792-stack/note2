@@ -771,6 +771,7 @@ button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .r
 
 /* ============ v4.26?????? / ?? / ?? / ?? / ???? / ?? / ?? ============ */
 body.markup-mode .paper-stack .paper-slot:not(.current) { display: none; }
+body.markup-mode .pages-panel { display: none; }
 body.markup-mode #paperHolder { overflow: hidden; }
 body.markup-mode .paper-stack { justify-content: center; }
 .note-tabs {
