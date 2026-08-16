@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.60';
+const APP_VERSION = '5.61';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -974,6 +974,7 @@ function bindUI() {
     if (act === 'templates') openTemplateManager();
     if (act === 'new-from-template') openTemplateManager();
     if (act === 'read-aloud') toggleReadAloud();
+    if (act === 'read-aloud-all') readAloudAll();
     if (act === 'find-in-note') findInNote();
     if (act === 'outline') outlineNote();
     if (act === 'insert-attach') $('#attachInput').click();
@@ -3646,6 +3647,10 @@ function ttsSpeakNext(tok) {
   if (tok !== ttsToken) return;
   if (!ttsQueue.length) { ttsActive = false; ttsClearHighlight(); toast('朗读完成'); return; }
   const cur = ttsQueue.shift();
+  if (cur.pageIndex != null && cur.pageIndex !== state.pageIndex) {
+    switchPage(cur.pageIndex);
+    engine.invalidateRaster();
+  }
   ttsShowHighlight(cur.item);
   const u = new SpeechSynthesisUtterance(cur.text);
   u.lang = 'zh-CN';
@@ -3653,6 +3658,28 @@ function ttsSpeakNext(tok) {
   u.onend = () => ttsSpeakNext(tok);
   u.onerror = () => ttsSpeakNext(tok);
   window.speechSynthesis.speak(u);
+}
+
+function readAloudAll() {
+  const note = currentNote();
+  if (!note) return;
+  if (!('speechSynthesis' in window)) { toast('此设备不支持朗读'); return; }
+  const queue = [];
+  note.pages.forEach((p, pi) => {
+    ((p.texts || []).filter(t => (t.text || '').trim())).forEach(item => {
+      let sentences = (item.text || '').split(/(?<=[。！？；!?;])/).map(x => x.trim()).filter(Boolean);
+      if (!sentences.length) sentences = [(item.text || '').trim()];
+      for (const s of sentences) queue.push({ item, text: s, pageIndex: pi });
+    });
+  });
+  if (!queue.length) { toast('笔记中没有文字内容'); return; }
+  ttsToken++;
+  const tok = ttsToken;
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  ttsQueue = queue;
+  ttsActive = true;
+  ttsSpeakNext(tok);
+  toast('正在朗读整篇笔记…');
 }
 
 function toggleReadAloud() {
@@ -4924,7 +4951,7 @@ async function init() {
     deletePageAt, clearBlankPages,
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
-    toggleReadAloud, exportNoteText, notebookColor,
+    toggleReadAloud, readAloudAll, exportNoteText, notebookColor,
     renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
