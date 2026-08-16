@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.7';
+const APP_VERSION = '5.8';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -55,6 +55,7 @@ function settings() {
 }
 
 /* ---------------- 引擎 ---------------- */
+let twoFingerTurnLock = 0;
 const engine = new DrawingEngine($('#viewCanvas'), {
   getPage: () => currentPage(),
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
@@ -116,12 +117,13 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     if (act === 'redo') redo();
   },
   onTwoFingerScroll: (dy) => {
-    // 双指上下滑动 = 连续滚动纸张
-    const ph = $('#paperHolder');
-    if (!ph) return false;
-    const before = ph.scrollTop;
-    ph.scrollTop -= dy;
-    return ph.scrollTop !== before;
+    // 单页模式：双指上下滑 = 翻页（上滑下一页，下滑上一页），带翻页锁防连翻
+    if (Math.abs(dy) < 50) return false;
+    if (Date.now() - twoFingerTurnLock < 400) return true;
+    twoFingerTurnLock = Date.now();
+    if (dy < 0) switchPage(state.pageIndex + 1);
+    else switchPage(state.pageIndex - 1);
+    return true;
   }
 });
 let moveBefore = null;
@@ -1781,58 +1783,17 @@ function refreshThumbs() {
   });
 }
 
-/* 连续纸张视图：所有页纵向排成一列，当前页可书写，相邻页渲染，其余占位 */
+/* 单页视图：简单一张纸居中，深色背景，缩放时周围不露白 */
 let _vcCache = null, _tlCache = null;
 function renderPaperStack() {
-  const note = currentNote();
   const holder = $('#paperHolder');
   if (!holder) return;
   if (!_vcCache) _vcCache = document.getElementById('viewCanvas');
   if (!_tlCache) _tlCache = document.getElementById('textLayer');
-  let stack = $('#paperStack');
-  if (!stack) {
-    stack = document.createElement('div');
-    stack.id = 'paperStack';
-    stack.className = 'paper-stack';
-    holder.insertBefore(stack, holder.firstChild);
-  }
-  stack.innerHTML = '';
-  if (!note) { stack.style.display = 'none'; return; }
-  stack.style.display = 'flex';
-  note.pages.forEach((page, i) => {
-    const slot = document.createElement('div');
-    slot.className = 'paper-slot' + (i === state.pageIndex ? ' current' : '');
-    slot.dataset.i = String(i);
-    if (i === state.pageIndex) {
-      if (_vcCache && _vcCache.parentElement !== slot) slot.appendChild(_vcCache);
-      if (_tlCache && _tlCache.parentElement !== slot) slot.appendChild(_tlCache);
-      const num = document.createElement('span');
-      num.className = 'paper-slot-num';
-      num.textContent = i + 1;
-      slot.appendChild(num);
-    } else {
-      if (Math.abs(i - state.pageIndex) <= 2) {
-        const cv = document.createElement('canvas');
-        renderPageToCanvas(cv, page, note.paper, 640, FONT);
-        slot.appendChild(cv);
-      } else {
-        slot.classList.add('placeholder');
-        const num = document.createElement('span');
-        num.className = 'paper-slot-num';
-        num.textContent = i + 1;
-        slot.appendChild(num);
-      }
-      slot.addEventListener('click', () => { if (i !== state.pageIndex && currentNote()) switchPage(i); });
-    }
-    stack.appendChild(slot);
-  });
-  requestAnimationFrame(() => {
-    const cur = stack.querySelector('.paper-slot.current');
-    if (cur) {
-      const target = cur.offsetTop - holder.clientHeight / 2 + cur.clientHeight / 2;
-      holder.scrollTop = Math.max(0, target);
-    }
-  });
+  const stack = $('#paperStack');
+  if (stack) stack.style.display = 'none';
+  if (_vcCache && _vcCache.parentElement !== holder) holder.appendChild(_vcCache);
+  if (_tlCache && _tlCache.parentElement !== holder) holder.appendChild(_tlCache);
 }
 
 function renderPages() {
@@ -2375,28 +2336,6 @@ function bindV426UI() {
     document.querySelectorAll('.settings-sec').forEach(x => x.classList.toggle('active', x.id === 'sec-' + b.dataset.sec));
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#settingsPanel') && !$('#settingsPanel').classList.contains('hidden')) $('#settingsPanel').classList.add('hidden'); });
-  // 连续纸张：滚动停止后吸附最近的一页为当前页
-  const pHolder = $('#paperHolder');
-  if (pHolder) {
-    let st = null;
-    pHolder.addEventListener('scroll', () => {
-      clearTimeout(st);
-      st = setTimeout(() => {
-        const stack = $('#paperStack');
-        if (!stack || !currentNote()) return;
-        const slots = [...stack.querySelectorAll('.paper-slot')];
-        if (!slots.length) return;
-        const mid = pHolder.scrollTop + pHolder.clientHeight / 2;
-        let best = slots[0], bd = Infinity;
-        for (const s of slots) {
-          const d = Math.abs((s.offsetTop + s.clientHeight / 2) - mid);
-          if (d < bd) { bd = d; best = s; }
-        }
-        const idx = Number(best.dataset.i);
-        if (idx !== state.pageIndex) switchPage(idx);
-      }, 260);
-    });
-  }
   // 手指在纸张左右边缘水平滑动翻页
   const ph = $('#paperHolder');
   if (ph) {
@@ -2425,23 +2364,13 @@ function bindV426UI() {
       }
     }, true);
     ph.addEventListener('pointercancel', () => { swipe = null; }, true);
-    // 非纸张区域单指拖动滚动 + 鼠标滚轮滚动
-    let dragScroll = null;
-    ph.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
-      if (e.target.closest('.paper-slot')) return;
-      dragScroll = { id: e.pointerId, y0: e.clientY, st0: ph.scrollTop };
-    }, true);
-    ph.addEventListener('pointermove', (e) => {
-      if (!dragScroll || dragScroll.id !== e.pointerId) return;
-      ph.scrollTop = dragScroll.st0 - (e.clientY - dragScroll.y0);
-    }, true);
-    ph.addEventListener('pointerup', () => { dragScroll = null; }, true);
-    ph.addEventListener('pointercancel', () => { dragScroll = null; }, true);
+    // 鼠标滚轮翻页
     ph.addEventListener('wheel', (e) => {
       e.preventDefault();
-      ph.scrollTop += e.deltaY;
+      if (e.deltaY > 30) switchPage(state.pageIndex + 1);
+      else if (e.deltaY < -30) switchPage(state.pageIndex - 1);
     }, { passive: false });
+
   }
 }
 /* ---------------- AI 助手（DeepSeek，经本地服务器代理） ---------------- */

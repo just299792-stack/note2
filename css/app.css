@@ -1040,3 +1040,14 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 .paper-holder::before { display: none !important; }
 
 .about-version { font-size: 13px; font-weight: 700; color: var(--text-2); }
+
+/* ============ v5.8 单页视图：简单一张纸 ============ */
+.paper-holder {
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  background: #16181d !important;
+}
+.paper-stack { display: none !important; }
+#viewCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.text-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
