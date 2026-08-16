@@ -869,6 +869,7 @@ export class DrawingEngine {
     this.selection = ids.size ? { ids: [...ids], box: this.computeBox(ids), moving: false, offset: null } : null;
     this.dirtyView = true;
     this.requestFrame();
+    if (this.cb.onSelection) this.cb.onSelection(ids.size ? [...ids] : []);
   }
 
   polyIntersectsBox(path, box) {
@@ -1089,7 +1090,7 @@ export class DrawingEngine {
 
   getSelectionIds() { return this.selection ? this.selection.ids : []; }
   getSelectedBox() { return this.selection && this.selection.ids.length ? this.selection.box : null; }
-  clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); }
+  clearSelection() { this.selection = null; this.dirtyView = true; this.requestFrame(); if (this.cb.onSelection) this.cb.onSelection([]); }
 }
 
 

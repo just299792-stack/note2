@@ -248,6 +248,7 @@
           <button class="menu-item" data-action="clear-blank-pages">删除空白页</button>
           <button class="menu-item" data-action="read-aloud">朗读当前页文字</button>
           <button class="menu-item" data-action="insert-template-page">插入模板页…</button>
+          <button class="menu-item" data-action="apply-template">应用模板到当前页…</button>
           <button class="menu-item" data-action="find-in-note">在笔记中查找 (Ctrl+F)…</button>
           <button class="menu-item" data-action="outline">大纲…</button>
           <div class="set-row"><span class="set-label">朗读速度</span><div id="ttsRateRow" class="seg"></div></div>
@@ -312,6 +313,11 @@
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
 <input type="file" id="attachInput" hidden>
+  <div id="selBar" class="sel-bar hidden">
+    <button id="selCopy" class="mini-btn">复制</button>
+    <button id="selDel" class="mini-btn danger">删除</button>
+    <button id="selClose" class="mini-btn">✕</button>
+  </div>
   <div id="multiBar" class="multi-bar hidden">
     <span id="multiCount" class="multi-count">已选 0</span>
     <button class="mini-btn" id="multiMove">移动…</button>
