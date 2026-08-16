@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.80';
+const APP_VERSION = '5.81';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4452,6 +4452,10 @@ function toggleAIPanel() {
 function updateAISend() {
   const btn = $('#aiSend');
   if (btn) btn.disabled = aiBusy;
+  const inp = $('#aiInput');
+  if (inp) inp.disabled = aiBusy;
+  const st = $('#aiStatus');
+  if (st) st.textContent = aiBusy ? '生成中…' : '';
 }
 
 async function sendAIMessage() {

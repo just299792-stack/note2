@@ -1012,6 +1012,7 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 .ai-acts { display: flex; gap: 6px; margin-top: 6px; }
 .ai-act { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-2); cursor: pointer; }
 .ai-act:hover { color: var(--accent); border-color: var(--accent); }
+.ai-status { font-size: 11px; color: var(--accent); align-self: center; }
 .ai-msg { display: flex; flex-direction: column; }
 .ai-msg.user { justify-content: flex-end; }
 .ai-bubble {
