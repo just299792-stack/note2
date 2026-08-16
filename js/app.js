@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.74';
+const APP_VERSION = '5.75';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4569,19 +4569,19 @@ function confirmModal(title, desc, confirmText, danger, onConfirm) {
 
 function aboutModal() {
   modalShell('关于「笔记」', `
-    <div class="m-desc" style="line-height:1.8">
-      <b>笔记</b> 是一款 Notability 风格的手写笔记应用。<br>
-      · Apple Pencil 压力感应书写<br>
-      · 荧光笔、橡皮擦、套索、文字、形状<br>
-      · 双指缩放平移 · 放大镜<br>
-      · 笔记本 / 项目组织，页面管理<br>
-      · 导出 .note / PDF，通过分享或文件转移<br>
-      · 离线可用，数据保存在本机<br>
-      · 开源仓库：github.com/just299792-stack/note2<br>
+    <div class="m-desc" style="line-height:1.9">
+      <b>笔记</b> · Notability 风格手写笔记（iPad 优先，离线可用）<br>
+      ✍️ 书写：压力钢笔 / 圆珠笔 / 荧光笔 / 橡皮 / 套索 / 文字 / 形状；笔型与自定义颜色<br>
+      📄 纸张：10 种样式 × 自定义颜色，标准/宽版，行距可调，模板中心<br>
+      🎙 录音：波形定位、调速、自动记录翻页、笔迹重画回放、单独导出音频<br>
+      📷 扫描：拍照/相册多张连拍生成多页笔记；PDF 导入标注<br>
+      🤖 AI：DeepSeek 问答、一键总结、回答插入笔记/朗读、自定义角色<br>
+      📤 导出：.note / PDF(封面/页范围) / 长图 / PNG / .notebook / .txt / .rtf / .md / 资料库 PDF<br>
+      🔒 数据：自动保存+已保存指示 / 回收站 / 快照备份(手动/自动) / 多用户同步<br>
       <br>
       资料库：${state.lib.subjects.length} 个项目 · ${state.lib.subjects.reduce((a, s) => a + s.notebooks.length, 0)} 个笔记本 · ${Object.keys(state.lib.notes).length} 篇笔记 · ${Object.values(state.lib.notes).reduce((a, n) => a + n.pages.length, 0)} 页<br>
       <br>
-      版本 ${APP_VERSION} · 2026-08-14
+      版本 ${APP_VERSION} · 开源：github.com/just299792-stack/note2
     </div>`, [
     { label: '好的', primary: true }
   ]);
