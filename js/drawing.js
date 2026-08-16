@@ -21,6 +21,25 @@ const PAPER_INFO = {
 export function paperInfo(color) { return PAPER_INFO[color] || PAPER_INFO.white; }
 
 /* ================= 共享渲染函数 ================= */
+/* 细腻纸纹（缓存一次性噪点纹理） */
+let _noiseCanvas = null;
+function paperNoise() {
+  if (_noiseCanvas) return _noiseCanvas;
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const x = c.getContext('2d');
+  const img = x.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 128 + (Math.random() * 60 - 30);
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = Math.random() * 40;
+  }
+  x.putImageData(img, 0, 0);
+  _noiseCanvas = c;
+  return c;
+}
+
+
 export function drawPaper(ctx, style, color, w, h, spacing) {
   const info = paperInfo(color);
   ctx.fillStyle = info.bg;
@@ -103,6 +122,14 @@ export function drawPaper(ctx, style, color, w, h, spacing) {
       ctx.fillText(String(n++), 16, y - LINE / 2);
     }
   }
+  // 细腻纸纹
+  const noise = paperNoise();
+  ctx.save();
+  ctx.globalAlpha = info.dark ? 0.16 : 0.05;
+  ctx.globalCompositeOperation = info.dark ? 'screen' : 'multiply';
+  const nw = noise.width, nh = noise.height;
+  for (let y = 0; y < h; y += nh) for (let x = 0; x < w; x += nw) ctx.drawImage(noise, x, y);
+  ctx.restore();
   return info;
 }
 

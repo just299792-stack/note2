@@ -1129,3 +1129,10 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 .nb-emojis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 8px 0; }
 .nb-emoji { font-size: 24px; padding: 8px; border-radius: 10px; background: var(--bg-elev2); border: 1px solid var(--border); transition: transform .15s, background .15s; }
 .nb-emoji:hover { transform: scale(1.12); background: var(--accent-soft); }
+
+.att-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.att-name { flex: 1; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-size { flex: none; font-size: 11px; color: var(--text-3); }
+.att-row .mini-btn { flex: none; }
+.welcome-body p { margin: 8px 0; font-size: 14px; color: var(--text); line-height: 1.6; }
+.welcome-body p:first-child { margin-top: 4px; }

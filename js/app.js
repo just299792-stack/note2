@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.15';
+const APP_VERSION = '5.16';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -813,6 +813,8 @@ function bindUI() {
     if (act === 'read-aloud') toggleReadAloud();
     if (act === 'find-in-note') findInNote();
     if (act === 'outline') outlineNote();
+    if (act === 'insert-attach') $('#attachInput').click();
+    if (act === 'attachments') manageAttachments();
     if (act === 'export-text') exportNoteText();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
@@ -2556,6 +2558,7 @@ function bindV426UI() {
   const imgIn = $('#imageInput'); if (imgIn) imgIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertImage(f, 'gallery'); });
   const camIn = $('#cameraInput'); if (camIn) camIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertImage(f, 'camera'); });
   const pdfIn = $('#pdfInput'); if (pdfIn) pdfIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await importPdf(f); });
+  const attIn = $('#attachInput'); if (attIn) attIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertAttachment(f); });
   const oFav = $('#optFavBar'); if (oFav) oFav.addEventListener('change', (e) => { state.lib.settings.favoritesBar = e.target.checked; saveLibrary(state.lib); renderFavorites(); });
   const oBak = $('#optAutoBackup'); if (oBak) oBak.addEventListener('change', (e) => { state.lib.settings.autoBackup = e.target.checked; saveLibrary(state.lib); if (e.target.checked) scheduleSnapshot(true); });
   const pPrev = $('#presPrev'); if (pPrev) pPrev.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex - 1); renderPresPage(); } });
@@ -2848,6 +2851,74 @@ function newNoteFromTemplate(tpl) {
   openNote(note.id);
   renderLibrary();
   toast('已用模板新建笔记');
+}
+/* ---------------- 附件 / 新手引导 ---------------- */
+async function insertAttachment(file) {
+  if (!file) return;
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  const attId = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  await saveAudioBlob('attach:' + note.id + ':' + attId, file);
+  note.attachments = note.attachments || [];
+  note.attachments.push({ id: attId, name: file.name || '附件', size: file.size || 0, type: file.type || '' });
+  saveLibrary(state.lib);
+  toast('已添加附件：' + (file.name || '附件'));
+}
+
+function fmtSize(n) {
+  if (!n) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+async function manageAttachments() {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  const list = note.attachments || [];
+  if (!list.length) {
+    confirmModal('还没有附件', '可以在「插入附件…」里添加文件（PDF、图片、文档等），需要时再打开或分享。', '知道了');
+    return;
+  }
+  const body = list.map(a => `<div class="att-row" data-id="${a.id}">
+      <span class="att-name">${escapeHtml(a.name)}</span><span class="att-size">${fmtSize(a.size)}</span>
+      <button class="mini-btn" data-open="${a.id}">打开</button>
+      <button class="mini-btn danger" data-del="${a.id}">删除</button>
+    </div>`).join('');
+  modalShell('附件', body, [{ label: '关闭' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', async () => {
+    const a = list.find(x => x.id === b.dataset.open);
+    if (!a) return;
+    const blob = await getAudioBlob('attach:' + note.id + ':' + a.id);
+    if (!blob) { toast('附件文件不存在'); return; }
+    closeModal();
+    await shareOrDownload(blob, a.name);
+  }));
+  mask.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    const a = list.find(x => x.id === b.dataset.del);
+    if (!a) return;
+    await deleteAudioBlob('attach:' + note.id + ':' + a.id);
+    note.attachments = note.attachments.filter(x => x.id !== a.id);
+    saveLibrary(state.lib);
+    manageAttachments();
+  }));
+}
+
+function showWelcomeGuide() {
+  try {
+    if (localStorage.getItem('note2-welcomed')) return;
+    localStorage.setItem('note2-welcomed', '1');
+  } catch (_) {}
+  modalShell('欢迎使用「笔记」', '<div class="welcome-body">' +
+    '<p>✍️ 用 Apple Pencil 或手指直接书写</p>' +
+    '<p>👆 单指上下滑 = 连续滚动纸张</p>' +
+    '<p>🤏 双指捏合 = 整条纸一起缩放</p>' +
+    '<p>👈👉 双指左右滑 / 纸边缘滑 = 翻页</p>' +
+    '<p>✌️ 双指轻点 = 撤销 · 🤟 三指轻点 = 重做</p>' +
+    '<p>✨ 右下角 AI 助手可结合笔记提问</p>' +
+    '</div>', [{ label: '开始使用', primary: true }]);
 }
 /* ---------------- AI 助手（DeepSeek，经本地服务器代理） ---------------- */
 let aiHistory = [];
@@ -3495,6 +3566,7 @@ async function init() {
   bindUI();
   bindV426UI();
   bindAIUI();
+  showWelcomeGuide();
   updateToolUI();
   updateColorUI();
   const ofEl = $('#optFinger'); if (ofEl) ofEl.checked = !!lib.settings.fingerDraw;
@@ -3546,7 +3618,8 @@ async function init() {
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
     toggleReadAloud, exportNoteText, notebookColor,
-    renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji };
+    renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
+    insertAttachment, manageAttachments, showWelcomeGuide };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
