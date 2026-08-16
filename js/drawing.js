@@ -465,6 +465,7 @@ export class DrawingEngine {
     this.ox = sx - w.x * ns;
     this.oy = sy - w.y * ns;
     this.dirtyView = true;
+    if (this.cb.onZoom) this.cb.onZoom(this.scale);
   }
 
   local(e) {
@@ -744,6 +745,7 @@ export class DrawingEngine {
       const wmy = (g.mid.y - g.oy) / g.scale;
       this.ox = mid.x - wmx * ns;
       this.oy = mid.y - wmy * ns;
+      if (this.cb.onZoom) this.cb.onZoom(this.scale);
     }
     this.dirtyView = true;
     this.requestFrame();

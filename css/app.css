@@ -1067,8 +1067,9 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
   flex-direction: column; align-items: center; gap: 0;
   padding: 28px 0 90px; min-height: 100%;
 }
+:root { --paper-zoom: 1; }
 .paper-slot {
-  position: relative; width: min(96%, 780px); flex: none;
+  position: relative; width: calc(min(96%, 780px) * var(--paper-zoom, 1)); flex: none;
   aspect-ratio: 816 / 1056;
   border-radius: 0; overflow: hidden;
   background: #fffefb; box-shadow: none;

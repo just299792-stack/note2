@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.9';
+const APP_VERSION = '5.10';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -56,6 +56,7 @@ function settings() {
 
 /* ---------------- 引擎 ---------------- */
 let twoFingerTurnLock = 0;
+let fitScaleRef = 0;
 const engine = new DrawingEngine($('#viewCanvas'), {
   getPage: () => currentPage(),
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
@@ -123,6 +124,15 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     const before = ph.scrollTop;
     ph.scrollTop -= dy;
     return ph.scrollTop !== before;
+  },
+  onZoom: (ns) => {
+    // 连续纸视图：缩放时所有页面一起变宽窄（CSS --paper-zoom），引擎保持 fit
+    if (!fitScaleRef) fitScaleRef = ns;
+    const f = Math.max(0.5, Math.min(2.5, ns / fitScaleRef));
+    document.documentElement.style.setProperty('--paper-zoom', String(f));
+    engine.fitView();
+    fitScaleRef = engine.scale;
+    engine.invalidateRaster();
   }
 });
 let moveBefore = null;
@@ -1784,7 +1794,7 @@ function refreshThumbs() {
 
 /* 连续纸张视图：所有页纵向连成一列，中间一条分割线，可连续滑动 */
 let _vcCache = null, _tlCache = null;
-function renderPaperStack() {
+function renderPaperStack(keepScroll) {
   const note = currentNote();
   const holder = $('#paperHolder');
   if (!holder) return;
@@ -1827,13 +1837,15 @@ function renderPaperStack() {
     }
     stack.appendChild(slot);
   });
-  requestAnimationFrame(() => {
-    const cur = stack.querySelector('.paper-slot.current');
-    if (cur) {
-      const target = cur.offsetTop - holder.clientHeight / 2 + cur.clientHeight / 2;
-      holder.scrollTop = Math.max(0, target);
-    }
-  });
+  if (!keepScroll) {
+    requestAnimationFrame(() => {
+      const cur = stack.querySelector('.paper-slot.current');
+      if (cur) {
+        const target = cur.offsetTop - holder.clientHeight / 2 + cur.clientHeight / 2;
+        holder.scrollTop = Math.max(0, target);
+      }
+    });
+  }
 }
 
 function renderPages() {
@@ -2394,7 +2406,17 @@ function bindV426UI() {
           if (d < bd) { bd = d; best = s; }
         }
         const idx = Number(best.dataset.i);
-        if (idx !== state.pageIndex) switchPage(idx);
+        if (idx !== state.pageIndex) {
+          // 静默跟随：不跳转、不重定位，只在原地把最近页设为当前页
+          state.pageIndex = idx;
+          engine.setPage(currentPage());
+          engine.invalidateRaster();
+          renderPages();
+          renderPaperStack(true);
+          updatePageNav();
+          state.lib.active.pageIndex = idx;
+          saveSoon();
+        }
       }, 260);
     });
   }
