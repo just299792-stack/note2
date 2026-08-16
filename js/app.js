@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.52';
+const APP_VERSION = '5.53';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -979,6 +979,7 @@ function bindUI() {
     if (act === 'stats') noteStats();
     if (act === 'export-text') exportNoteText();
     if (act === 'export-rtf') exportNoteRtf();
+    if (act === 'export-md') exportNoteMarkdown();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
     if (act === 'add-page') addPage();
@@ -3603,6 +3604,24 @@ async function exportNoteRtf() {
   const blob = new Blob([parts.join('\n')], { type: 'application/rtf' });
   await shareOrDownload(blob, safeName(note.title) + '.rtf');
 }
+async function exportNoteMarkdown() {
+  const note = currentNote();
+  if (!note) return;
+  const parts = ['# ' + (note.title || '未命名笔记')];
+  parts.push('');
+  note.pages.forEach((p, i) => {
+    const ts = (p.texts || []).map(t => t.text).filter(Boolean);
+    if (ts.length) {
+      parts.push('## 第 ' + (i + 1) + ' 页');
+      parts.push('');
+      ts.forEach(t => parts.push('- ' + String(t).replace(/\n/g, '\n  ')));
+      parts.push('');
+    }
+  });
+  const body = parts.join('\n').trim() || '（笔记中没有文字内容）';
+  const blob = new Blob([body], { type: 'text/markdown;charset=utf-8' });
+  await shareOrDownload(blob, safeName(note.title) + '.md');
+}
 
 /* ---------------- 模板化新建（Notability 新建流程） ---------------- */
 function openNewNoteMenu() {
@@ -4785,7 +4804,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf, exportNoteMarkdown };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
