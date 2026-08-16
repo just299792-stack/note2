@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.56';
+const APP_VERSION = '5.57';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1224,6 +1224,14 @@ function updatePaperUI() {
     sw.addEventListener('click', () => setPaper(note.paper.style, c));
     colors.appendChild(sw);
   }
+  // 自定义纸张颜色
+  const cust = document.createElement('label');
+  cust.className = 'paper-color cust';
+  cust.title = '自定义纸张颜色';
+  cust.innerHTML = '<input type="color" value="' + (String(note.paper.color).startsWith('#') ? note.paper.color : '#fffefb') + '">';
+  const ci = cust.querySelector('input');
+  ci.addEventListener('input', () => setPaper(note.paper.style, ci.value));
+  colors.appendChild(cust);
 }
 
 /* ---------------- 设置面板与工具栏布局 ---------------- */

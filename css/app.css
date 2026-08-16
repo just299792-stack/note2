@@ -280,6 +280,8 @@ button:disabled { opacity: .35; pointer-events: none; }
 .paper-colors { display: flex; gap: 8px; padding: 0 10px 8px; }
 .paper-color { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(0,0,0,.14); }
 .paper-color.active { box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent); }
+.paper-color.cust { position: relative; overflow: hidden; background: conic-gradient(#fff, #ffd, #ffe0d0, #e6f4ff, #f0e8ff, #fff); border: 1.5px dashed rgba(0,0,0,.25); }
+.paper-color.cust input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 /* ---------------- 提示 ---------------- */
 .toast {

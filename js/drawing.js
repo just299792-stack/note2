@@ -18,7 +18,19 @@ const PAPER_INFO = {
   blue:   { bg: '#eef4ff',  line: 'rgba(90,120,200,.32)',   grid: 'rgba(90,120,200,.28)',   dot: 'rgba(90,120,200,.40)',   dark: false, name: '淡蓝' },
   green:  { bg: '#f0fbf3',  line: 'rgba(80,160,110,.32)',   grid: 'rgba(80,160,110,.28)',   dot: 'rgba(80,160,110,.40)',   dark: false, name: '淡绿' }
 };
-export function paperInfo(color) { return PAPER_INFO[color] || PAPER_INFO.white; }
+export function paperInfo(color) {
+  if (PAPER_INFO[color]) return PAPER_INFO[color];
+  if (typeof color === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color)) {
+    const hex = color.replace('#', '');
+    const full = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+    const r = parseInt(full.slice(0, 2), 16), g = parseInt(full.slice(2, 4), 16), b = parseInt(full.slice(4, 6), 16);
+    const lum = (r * 299 + g * 587 + b * 114) / 1000;
+    const dark = lum < 140;
+    const mk = (a) => dark ? 'rgba(255,255,255,' + a + ')' : 'rgba(60,80,110,' + a + ')';
+    return { bg: color, line: mk(0.35), grid: mk(0.30), dot: mk(0.45), dark, name: '自定义' };
+  }
+  return PAPER_INFO.white;
+}
 
 /* ================= 共享渲染函数 ================= */
 /* 细腻纸纹（缓存一次性噪点纹理） */
@@ -28,13 +40,26 @@ function paperNoise() {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
   const x = c.getContext('2d');
+  // 细颗粒纸纹
   const img = x.createImageData(256, 256);
   for (let i = 0; i < img.data.length; i += 4) {
-    const v = 128 + (Math.random() * 60 - 30);
+    const v = 128 + (Math.random() * 44 - 22);
     img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-    img.data[i + 3] = Math.random() * 40;
+    img.data[i + 3] = Math.random() * 26;
   }
   x.putImageData(img, 0, 0);
+  // 稀少柔和纤维丝（更贴近真实纸张）
+  x.globalCompositeOperation = 'lighter';
+  for (let f = 0; f < 5; f++) {
+    x.strokeStyle = 'rgba(200,190,170,' + (0.03 + Math.random() * 0.04) + ')';
+    x.lineWidth = 1;
+    x.beginPath();
+    const y0 = Math.random() * 256;
+    x.moveTo(0, y0);
+    x.bezierCurveTo(64, y0 + (Math.random() * 10 - 5), 192, y0 + (Math.random() * 10 - 5), 256, y0 + (Math.random() * 8 - 4));
+    x.stroke();
+  }
+  x.globalCompositeOperation = 'source-over';
   _noiseCanvas = c;
   return c;
 }
