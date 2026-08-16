@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.87';
+const APP_VERSION = '5.88';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -916,6 +916,7 @@ function bindUI() {
   $('#recToggle').addEventListener('click', toggleRecording);
   $('#btnRec').classList.toggle('hidden', !state.recSupported);
   $('#btnNewNote').addEventListener('click', openNewNoteMenu);
+  const rcClear = $('#recClear'); if (rcClear) rcClear.addEventListener('click', clearAllRecordings);
   const rcBtn = $('#btnRecent');
   if (rcBtn) rcBtn.addEventListener('click', () => {
     state.showRecent = !state.showRecent;
@@ -5084,18 +5085,21 @@ async function deleteRecording(item) {
   refreshRecList();
   toast('已删除录音');
 }
-
-  // 导出录音音频文件（支持 iPadOS 分享/下载）
-  async function exportRecording(item) {
-    const note = currentNote();
-    if (!note) return;
-    const blob = await getAudioBlob('audio:' + note.id + ':' + item.id);
-    if (!blob) { toast('音频文件不存在'); return; }
-    const type = (blob.type || '').toLowerCase();
-    const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
-    const fname = safeName(note.title) + ' - ' + item.name + '.' + ext;
-    try { await shareOrDownload(blob, fname); } catch (_) { download(blob, fname); }
-  }
+async function clearAllRecordings() {
+  const note = currentNote();
+  if (!note) return;
+  const list = await getRecMeta(note.id);
+  if (!list.length) { toast('还没有录音'); return; }
+  confirmModal('清空全部录音？', '将删除本笔记的 ' + list.length + ' 段录音，无法恢复。', '清空', true, async () => {
+    for (const it of list) {
+      await deleteAudioBlob('audio:' + note.id + ':' + it.id);
+      await deleteRecTimeline(note.id, it.id);
+    }
+    await saveRecMeta(note.id, []);
+    refreshRecList();
+    toast('已清空全部录音');
+  });
+}
 
 /* ---------------- 恢复默认设置 ---------------- */
 function resetSettings() {
@@ -5211,7 +5215,7 @@ async function init() {
   try { if (!localStorage.getItem('note2-seen')) { localStorage.setItem('note2-seen', '1'); } } catch (_) {}
   // 调试句柄（供测试/排查使用）
   window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, deleteNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
-    rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
+    rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList, clearAllRecordings },
     renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
     addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, copySelectionText, pinSelectedNotes, tagSelectedNotes,
