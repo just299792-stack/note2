@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.38';
+const APP_VERSION = '5.39';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -466,6 +466,7 @@ function pageFade() {
 function switchPage(i) {
   const note = currentNote();
   if (!note || i < 0 || i >= note.pages.length) return;
+  if (i === state.pageIndex) return;
   const dir = i > state.pageIndex ? 'right' : 'left';
   state.pageIndex = i;
   engine.setPage(currentPage());
@@ -484,6 +485,7 @@ function switchPage(i) {
     ph.classList.add('turning-' + dir);
     setTimeout(() => ph.classList.remove('turning-right', 'turning-left'), 340);
   }
+  recPageTurn();
 }
 
 function applyPagesChange() {
@@ -508,6 +510,7 @@ function addPage() {
     () => { note.pages = after; afterPageArrayRestore(); });
   state.pageIndex += 1;
   applyPagesChange();
+  recPageTurn();
 }
 function afterPageArrayRestore() {
   const note = currentNote();
@@ -532,6 +535,7 @@ function duplicatePage() {
     () => { note.pages = after; afterPageArrayRestore(); });
   state.pageIndex += 1;
   applyPagesChange();
+  recPageTurn();
 }
 
 function clearPage() {
@@ -3839,14 +3843,25 @@ function escapeHtml(s) {
 
 function recCapture(type, data) {
   const r = state.rec;
-  if (!r.active || !r.noteId || !r.pageId) return;
-  const page = currentPage();
-  if (!page || page.id !== r.pageId) return;
+  if (!r.active || !r.noteId) return;
   r.timeline.push({
     t: Date.now() - r.startTime,
     type,
     data: type === 'stroke' ? JSON.parse(JSON.stringify(data)) : data,
     pageId: currentPage() ? currentPage().id : r.pageId
+  });
+}
+
+// 录音时记录翻页（Notability：录音期间翻页被记入时间线，回放自动跟随）
+function recPageTurn() {
+  const r = state.rec;
+  if (!r.active || !r.noteId) return;
+  const page = currentPage();
+  r.timeline.push({
+    t: Date.now() - r.startTime,
+    type: 'page',
+    data: { to: state.pageIndex },
+    pageId: page ? page.id : r.pageId
   });
 }
 
