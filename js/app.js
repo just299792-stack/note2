@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.5';
+const APP_VERSION = '5.6';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2424,6 +2424,23 @@ function bindV426UI() {
       }
     }, true);
     ph.addEventListener('pointercancel', () => { swipe = null; }, true);
+    // 非纸张区域单指拖动滚动 + 鼠标滚轮滚动
+    let dragScroll = null;
+    ph.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'mouse') return;
+      if (e.target.closest('.paper-slot')) return;
+      dragScroll = { id: e.pointerId, y0: e.clientY, st0: ph.scrollTop };
+    }, true);
+    ph.addEventListener('pointermove', (e) => {
+      if (!dragScroll || dragScroll.id !== e.pointerId) return;
+      ph.scrollTop = dragScroll.st0 - (e.clientY - dragScroll.y0);
+    }, true);
+    ph.addEventListener('pointerup', () => { dragScroll = null; }, true);
+    ph.addEventListener('pointercancel', () => { dragScroll = null; }, true);
+    ph.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      ph.scrollTop += e.deltaY;
+    }, { passive: false });
   }
 }
 /* ---------------- AI 助手（DeepSeek，经本地服务器代理） ---------------- */

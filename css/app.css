@@ -1021,3 +1021,20 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 #viewCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .text-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .empty-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+
+/* ============ v5.6 连续纸无缝合拢 + 深色画布（只要纸张） ============ */
+.paper-holder { background: #16181d !important; }
+.paper-stack { gap: 0; padding: 28px 0 90px; }
+.paper-slot {
+  width: min(96%, 780px);
+  border-radius: 0;
+  box-shadow: none;
+  background: #fffefb;
+}
+.paper-slot:not(:last-child) { border-bottom: 1px solid rgba(15,23,42,.18); }
+.paper-slot.current { box-shadow: inset 0 0 0 2px var(--accent); }
+.paper-slot.placeholder { background: rgba(255,255,255,.07); box-shadow: none; }
+.paper-slot.placeholder:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,.14); }
+.paper-slot.placeholder .paper-slot-num { color: rgba(255,255,255,.45); }
+.paper-slot-num { color: rgba(15,23,42,.38); }
+.paper-holder::before { display: none !important; }
