@@ -21,7 +21,12 @@ export function newLibrary() {
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
-      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26, templates: [],
+      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26, templates: [
+        { id: 'tpl-lecture', name: '听课笔记', paper: { style: 'cornell', color: 'white' }, bg: null, createdAt: 0 },
+        { id: 'tpl-meeting', name: '会议记录', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0 },
+        { id: 'tpl-todo', name: '待办清单', paper: { style: 'check', color: 'white' }, bg: null, createdAt: 0 },
+        { id: 'tpl-daily', name: '日程计划', paper: { style: 'planner', color: 'white' }, bg: null, createdAt: 0 }
+      ],
       theme: 'auto', accent: 'blue',
       favorites: [], favoritesBar: true,
       penStyle: 'normal', ballpenStyle: 'normal',

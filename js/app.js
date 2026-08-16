@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.11';
+const APP_VERSION = '5.12';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -794,6 +794,8 @@ function bindUI() {
     if (act === 'save-template') promptModal('保存当前页为模板', '', '模板名称', '保存', (nm) => { if (nm) saveCurrentAsTemplate(nm); });
     if (act === 'templates') openTemplateManager();
     if (act === 'new-from-template') openTemplateManager();
+    if (act === 'read-aloud') toggleReadAloud();
+    if (act === 'export-text') exportNoteText();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
     if (act === 'add-page') addPage();
@@ -1300,7 +1302,7 @@ function renderLibrary() {
         main.className = 'nb-main';
         main.innerHTML = `<span class="nb-icon"></span><span class="nb-name"></span>`;
         const hue = (nbi++ * 47) % 360;
-        main.querySelector('.nb-icon').style.background = `linear-gradient(135deg, hsl(${hue},78%,60%), hsl(${(hue + 45) % 360},72%,52%))`;
+        main.querySelector('.nb-icon').style.background = nb.color || `linear-gradient(135deg, hsl(${hue},78%,60%), hsl(${(hue + 45) % 360},72%,52%))`;
         main.querySelector('.nb-icon').textContent = nb.name.slice(0, 1);
         main.querySelector('.nb-name').textContent = nb.name;
         main.addEventListener('click', (e) => {
@@ -1508,6 +1510,7 @@ function noteActions(note, anchor) {
   menu.className = 'menu ni-menu';
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
     <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
     <button class="menu-item" data-act="multi"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h4M4 12h4M4 18h4M11 6h9M11 12h9M11 18h9"/></svg>多选</button>
     <button class="menu-item" data-act="copy"><svg viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制笔记</button>
@@ -1629,6 +1632,7 @@ function notebookActions(nb, anchor) {
   menu.className = 'menu ni-menu';
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -1636,10 +1640,24 @@ function notebookActions(nb, anchor) {
   menu.style.top = (r.bottom + 4) + 'px';
   document.body.appendChild(menu);
   menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNotebook(nb); });
+  menu.querySelector('[data-act="color"]').addEventListener('click', () => { menu.remove(); notebookColor(nb); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNotebookConfirm(nb); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
 
+function notebookColor(nb) {
+  const colors = ['#38bdf8', '#6366f1', '#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#fb7185', '#94a3b8'];
+  const body = `<div class="nb-colors">${colors.map(c => `<button class="nb-color" data-c="${c}" style="background:${c}"></button>`).join('')}</div>`;
+  modalShell('封面颜色', body, [{ label: '取消' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('.nb-color').forEach(b => b.addEventListener('click', () => {
+    nb.color = b.dataset.c;
+    saveLibrary(state.lib);
+    renderLibrary();
+    toast('已设置封面颜色');
+  }));
+}
 function renameNotebook(nb) {
   promptModal('重命名笔记本', '', '笔记本名称', '保存', (name) => {
     if (!name) return;
@@ -1772,6 +1790,7 @@ function subjectActions(subj, anchor) {
   menu.className = 'menu ni-menu';
   menu.innerHTML = `
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
+    <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
     <button class="menu-item danger" data-act="del"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>删除</button>`;
   const r = anchor.getBoundingClientRect();
   menu.style.position = 'fixed';
@@ -2551,6 +2570,44 @@ function bindV426UI() {
     ph.addEventListener('pointercancel', () => { oneFinger = null; }, true);
   }
 }
+/* ---------------- 朗读与导出文字（Notability 阅读/导出体验） ---------------- */
+let ttsActive = false;
+function toggleReadAloud() {
+  const texts = ((currentPage() && currentPage().texts) || []).map(t => t.text).filter(Boolean).join('。');
+  if (ttsActive) {
+    ttsActive = false;
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    toast('已停止朗读');
+    return;
+  }
+  if (!texts) { toast('当前页没有文字'); return; }
+  if (!('speechSynthesis' in window)) { toast('此设备不支持朗读'); return; }
+  const u = new SpeechSynthesisUtterance(texts);
+  u.lang = 'zh-CN';
+  u.rate = 1;
+  u.onend = () => { ttsActive = false; };
+  u.onerror = () => { ttsActive = false; };
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+  ttsActive = true;
+  toast('正在朗读当前页…');
+}
+
+async function exportNoteText() {
+  const note = currentNote();
+  if (!note) return;
+  const lines = [];
+  note.pages.forEach((p, i) => {
+    const ts = (p.texts || []).map(t => t.text).filter(Boolean);
+    if (ts.length) {
+      lines.push('—— 第 ' + (i + 1) + ' 页 ——');
+      lines.push(ts.join('\n'));
+    }
+  });
+  const body = lines.join('\n\n') || '（笔记中没有文字内容）';
+  const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
+  await shareOrDownload(blob, safeName(note.title) + '.txt');
+}
 /* ---------------- 模板中心（Notability Templates） ---------------- */
 function saveCurrentAsTemplate(name) {
   const note = currentNote();
@@ -3326,7 +3383,9 @@ async function init() {
     addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection,
     deletePageAt, clearBlankPages,
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
-    applyAccent, saveRecTimeline, getRecTimeline };
+    applyAccent, saveRecTimeline, getRecTimeline,
+    toggleReadAloud, exportNoteText, notebookColor,
+    renderLibrary };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
