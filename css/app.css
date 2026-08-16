@@ -1163,6 +1163,9 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 /* 模板中心 */
 .tpl-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .tpl-empty { font-size: 12px; color: var(--text-3); padding: 8px 2px; }
+.trash-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.trash-name { flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-time { font-size: 11px; color: var(--text-3); flex: none; }
 .crop-wrap { display: flex; justify-content: center; }
 .crop-stage { position: relative; touch-action: none; user-select: none; }
 .crop-stage img { display: block; max-width: 420px; border-radius: 6px; }

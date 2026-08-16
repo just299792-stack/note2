@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.59';
+const APP_VERSION = '5.60';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -936,6 +936,7 @@ function bindUI() {
   const mmEl = $('#multiMove'); if (mmEl) mmEl.addEventListener('click', moveSelectedNotes);
   const mdEl = $('#multiDelete'); if (mdEl) mdEl.addEventListener('click', deleteSelectedNotes);
   const mcEl = $('#multiCancel'); if (mcEl) mcEl.addEventListener('click', exitMulti);
+  const btnTrash = $('#btnTrash'); if (btnTrash) btnTrash.addEventListener('click', openTrash);
   $('#btnNewSubject').addEventListener('click', () => promptModal('新建项目', '', '项目名称', '创建', (name) => {
     if (!name) return;
     state.lib.subjects.push({ id: newId(), name, notebooks: [] });
@@ -1992,13 +1993,76 @@ function renameNote(note) {
 }
 
 function deleteNoteConfirm(note) {
-  confirmModal(`删除笔记「${note.title}」？`, '删除后该笔记的所有页面与内容将无法恢复。', '删除', true, () => deleteNote(note.id));
+  confirmModal(`删除笔记「${note.title}」？`, '删除后可到回收站恢复。', '删除', true, () => deleteNote(note.id));
 }
 
+/* ---- 回收站（软删除 + 恢复） ---- */
+function trashNote(noteId) {
+  const note = state.lib.notes[noteId];
+  if (!note) return;
+  const trash = state.lib.settings.trash || (state.lib.settings.trash = []);
+  trash.unshift({ id: noteId, note, deletedAt: Date.now() });
+  if (trash.length > 30) trash.length = 30;
+  delete state.lib.notes[noteId];
+}
+function openTrash() {
+  const trash = state.lib.settings.trash || [];
+  if (!trash.length) { toast('回收站是空的'); return; }
+  const body = trash.map((t, i) => '<div class="trash-row">' +
+    '<span class="trash-name">' + escapeHtml((t.note && t.note.title) || '未命名') + '</span>' +
+    '<span class="trash-time">' + (t.deletedAt ? new Date(t.deletedAt).toLocaleString('zh-CN') : '') + '</span>' +
+    '<button class="mini-btn primary" data-restore="' + i + '">恢复</button>' +
+    '<button class="mini-btn danger" data-purge="' + i + '">彻底删除</button>' +
+    '</div>').join('') +
+    '<div style="margin-top:8px;text-align:right"><button class="mini-btn danger" data-empty="1">清空回收站</button></div>';
+  modalShell('回收站', body, [{ label: '关闭' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', () => {
+    const t = trash[Number(b.dataset.restore)];
+    if (t) restoreNote(t.id);
+    openTrash();
+  }));
+  mask.querySelectorAll('[data-purge]').forEach(b => b.addEventListener('click', () => {
+    purgeTrash(Number(b.dataset.purge));
+    openTrash();
+  }));
+  const emp = mask.querySelector('[data-empty]');
+  if (emp) emp.addEventListener('click', () => { state.lib.settings.trash = []; saveLibrary(state.lib); openTrash(); });
+}
+function restoreNote(noteId) {
+  const trash = state.lib.settings.trash || [];
+  const idx = trash.findIndex(t => t.id === noteId);
+  if (idx < 0) return;
+  const t = trash[idx];
+  trash.splice(idx, 1);
+  state.lib.notes[noteId] = t.note;
+  let nb = t.note.notebookId ? findNotebook(state.lib, t.note.notebookId) : null;
+  if (!nb) {
+    const subj = state.lib.subjects[0];
+    if (subj) {
+      const nbObj = { id: newId(), name: '恢复的笔记', noteIds: [] };
+      subj.notebooks.push(nbObj);
+      t.note.notebookId = nbObj.id;
+      nb = { subject: subj, notebook: nbObj };
+    }
+  }
+  if (nb) nb.notebook.noteIds.push(noteId);
+  saveLibrary(state.lib);
+  renderLibrary();
+  toast('已恢复笔记');
+}
+function purgeTrash(i) {
+  const trash = state.lib.settings.trash || [];
+  if (i < 0 || i >= trash.length) return;
+  trash.splice(i, 1);
+  saveLibrary(state.lib);
+  toast('已彻底删除');
+}
 function deleteNote(noteId) {
   const nb = findNotebook(state.lib, state.activeNotebookId);
   if (nb) nb.notebook.noteIds = nb.notebook.noteIds.filter(id => id !== noteId);
-  delete state.lib.notes[noteId];
+  trashNote(noteId);
   const openTabs = getOpenTabs();
   const ti = openTabs.indexOf(noteId);
   if (ti >= 0) openTabs.splice(ti, 1);
@@ -2222,14 +2286,14 @@ function moveSelectedNotes() {
 function deleteSelectedNotes() {
   if (!state.multi.selected.size) { toast('请先选择笔记'); return; }
   const count = state.multi.selected.size;
-  confirmModal(`删除选中的 ${count} 篇笔记？`, '删除后无法恢复。', '删除', true, () => {
+  confirmModal(`删除选中的 ${count} 篇笔记？`, '删除后可到回收站恢复。', '删除', true, () => {
     const ids = [...state.multi.selected];
     for (const id of ids) {
       for (const s of state.lib.subjects) for (const nb of s.notebooks) {
         const i = nb.noteIds.indexOf(id);
         if (i >= 0) nb.noteIds.splice(i, 1);
       }
-      delete state.lib.notes[id];
+      trashNote(id);
     }
     if (state.activeNoteId && ids.includes(state.activeNoteId)) {
       const f = findNotebook(state.lib, state.activeNotebookId);
@@ -4852,7 +4916,7 @@ async function init() {
   // 记录首启
   try { if (!localStorage.getItem('note2-seen')) { localStorage.setItem('note2-seen', '1'); } } catch (_) {}
   // 调试句柄（供测试/排查使用）
-  window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
+  window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, deleteNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
     renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
@@ -4865,7 +4929,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, openTrash, restoreNote, purgeTrash };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
