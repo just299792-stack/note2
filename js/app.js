@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.27';
+const APP_VERSION = '5.28';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -134,6 +134,8 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   onSelection: (ids) => {
     const bar = $('#selBar');
     if (bar) bar.classList.toggle('hidden', !(ids && ids.length));
+    const rt = $('#selRotate');
+    if (rt) rt.style.display = (ids && ids.some(id => id.startsWith('i:'))) ? '' : 'none';
   },
   onTwoFingerScroll: (dy, dx) => {
     // 双指左右滑 = 翻页；双指上下滑 = 连续滚动纸张
@@ -1728,6 +1730,7 @@ function noteActions(note, anchor) {
     <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
     <button class="menu-item" data-act="emoji"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h16"/></svg>封面符号</button>
     <button class="menu-item" data-act="tagcolor"><svg viewBox="0 0 24 24" class="ic"><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7z"/></svg>标签颜色</button>
+    <button class="menu-item" data-act="savetpl"><svg viewBox="0 0 24 24" class="ic"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 12h6M12 9v6"/></svg>存为模板</button>
     <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
     <button class="menu-item" data-act="multi"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h4M4 12h4M4 18h4M11 6h9M11 12h9M11 18h9"/></svg>多选</button>
     <button class="menu-item" data-act="copy"><svg viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制笔记</button>
@@ -1861,6 +1864,7 @@ function notebookActions(nb, anchor) {
   menu.querySelector('[data-act="color"]').addEventListener('click', () => { menu.remove(); notebookColor(nb); });
   menu.querySelector('[data-act="emoji"]').addEventListener('click', () => { menu.remove(); noteEmoji(nb); });
   menu.querySelector('[data-act="tagcolor"]').addEventListener('click', () => { menu.remove(); noteTagColor(note); });
+  menu.querySelector('[data-act="savetpl"]').addEventListener('click', () => { menu.remove(); promptModal('保存当前页为模板', '', '模板名称', '保存', (nm) => { if (nm) saveCurrentAsTemplate(nm); }); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNotebookConfirm(nb); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -2763,6 +2767,24 @@ async function openSnapshots() {
 }
 
 /* ---- 选中内容：删除 / 复制 / 粘贴 ---- */
+function rotateSelection() {
+  const ids = engine.getSelectionIds();
+  if (!ids.length) return;
+  const page = currentPage();
+  if (!page) return;
+  let rotated = false;
+  for (const id of ids) {
+    if (id.startsWith('i:')) {
+      const im = page.images.find(x => x.id === id.slice(2));
+      if (im) { im.rot = ((im.rot || 0) + 90) % 360; rotated = true; }
+    }
+  }
+  if (!rotated) { toast('选中内容里没有图片'); return; }
+  engine.invalidateRaster();
+  renderPaperStack();
+  saveSoon(true);
+}
+
 function deleteSelection() {
   const ids = engine.getSelectionIds();
   if (!ids.length || !currentPage()) return;
@@ -2811,6 +2833,7 @@ function bindV426UI() {
   const favAdd = $('#favAdd'); if (favAdd) favAdd.addEventListener('click', addFavorite);
   const favEdit = $('#favEdit'); if (favEdit) favEdit.addEventListener('click', toggleFavEdit);
   const sCopy = $('#selCopy'); if (sCopy) sCopy.addEventListener('click', () => copySelection());
+  const sRot = $('#selRotate'); if (sRot) sRot.addEventListener('click', () => rotateSelection());
   const sDel = $('#selDel'); if (sDel) sDel.addEventListener('click', () => deleteSelection());
   const sClose = $('#selClose'); if (sClose) sClose.addEventListener('click', () => { $('#selBar').classList.add('hidden'); engine.clearSelection(); });
   const spd = $('#recSpeed');
@@ -4037,7 +4060,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
