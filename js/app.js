@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.16';
+const APP_VERSION = '5.17';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1162,6 +1162,18 @@ function renderSettings() {
     });
     dp.appendChild(colors);
   }
+  // 朗读速度
+  const ttsRow = $('#ttsRateRow');
+  if (ttsRow) {
+    ttsRow.innerHTML = '';
+    [[0.75, '慢'], [1, '正常'], [1.25, '快'], [1.5, '快上加快']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.ttsRate || 1) === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.ttsRate = v; saveLibrary(state.lib); renderSettings(); });
+      ttsRow.appendChild(b);
+    });
+  }
   // 当前笔记行距
   const spRow = $('#spacingRow');
   if (spRow && currentNote()) {
@@ -2122,15 +2134,38 @@ async function exportPagePng() {
   await shareOrDownload(blob, safeName(note.title) + '-第' + (state.pageIndex + 1) + '页.png');
 }
 
+function withPdfHeader(cv, title, idx, total) {
+  const h = 96;
+  const out = document.createElement('canvas');
+  out.width = cv.width; out.height = cv.height + h;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, out.width, h);
+  ctx.strokeStyle = 'rgba(15,23,42,.12)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, h - 2); ctx.lineTo(out.width, h - 2); ctx.stroke();
+  ctx.fillStyle = '#475569';
+  ctx.font = '600 30px ' + FONT;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText(String(title || '').slice(0, 60), 36, h / 2);
+  ctx.textAlign = 'right';
+  ctx.fillText((idx + 1) + ' / ' + total, out.width - 36, h / 2);
+  ctx.textAlign = 'left';
+  ctx.drawImage(cv, 0, h);
+  return out;
+}
+
 async function exportPdf() {
   const note = currentNote();
   if (!note) return;
   toast('正在生成 PDF…');
   await new Promise(r => setTimeout(r, 30));
-  const canvases = note.pages.map(page => {
+  const total = note.pages.length;
+  const canvases = note.pages.map((page, i) => {
     const cv = document.createElement('canvas');
     renderPageToCanvas(cv, page, note.paper, 1224, FONT);
-    return cv;
+    return withPdfHeader(cv, note.title, i, total);
   });
   const blob = canvasesToPdf(canvases, { title: note.title });
   await shareOrDownload(blob, safeName(note.title) + '.pdf');
@@ -2327,7 +2362,9 @@ async function importPdf(file) {
       delete window.__pdfRangeEnd;
     }
     const pages = [];
+    const totalImp = rEnd - rStart + 1;
     for (let i = rStart; i <= rEnd; i++) {
+      if ((i - rStart) % 5 === 0) toast('正在导入 ' + (i - rStart + 1) + '/' + totalImp + ' 页…');
       const pdfPage = await doc.getPage(i);
       const base = pdfPage.getViewport({ scale: 1 });
       const targetW = Math.min(1400, Math.round(base.width * 1.5));
@@ -2682,7 +2719,7 @@ function toggleReadAloud() {
   if (!('speechSynthesis' in window)) { toast('此设备不支持朗读'); return; }
   const u = new SpeechSynthesisUtterance(texts);
   u.lang = 'zh-CN';
-  u.rate = 1;
+  u.rate = (state.lib.settings.ttsRate || 1);
   u.onend = () => { ttsActive = false; };
   u.onerror = () => { ttsActive = false; };
   window.speechSynthesis.cancel();
