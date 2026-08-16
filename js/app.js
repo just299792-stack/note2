@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.33';
+const APP_VERSION = '5.34';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2925,6 +2925,12 @@ function bindV426UI() {
     if (pPen) pPen.addEventListener('click', (e) => { e.stopPropagation(); presDrawOn = !presDrawOn; pPen.classList.toggle('active', presDrawOn); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
+  document.addEventListener('keydown', (e) => {
+    if ($('#presMode') && !$('#presMode').classList.contains('hidden')) {
+      if (e.key === 'ArrowLeft') { switchPage(state.pageIndex - 1); renderPresPage(); }
+      else if (e.key === 'ArrowRight') { switchPage(state.pageIndex + 1); renderPresPage(); }
+    }
+  });
   window.addEventListener('pagehide', () => { if (state.lib && state.lib.settings.autoBackup !== false) saveSnapshot(state.lib); });
   // 设置面板：关闭 / 分类切换
   const sc = $('#settingsClose'); if (sc) sc.addEventListener('click', () => $('#settingsPanel').classList.add('hidden'));
