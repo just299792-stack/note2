@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.86';
+const APP_VERSION = '5.87';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2792,7 +2792,7 @@ async function exportPdf() {
 async function exportLibrary() {
   const data = { format: 'note2', version: 1, type: 'library', exportedAt: new Date().toISOString(), library: state.lib };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  await shareOrDownload(blob, '笔记资料库.notebook');
+  await shareOrDownload(blob, '笔记资料库 ' + new Date().toISOString().slice(0, 10) + '.notebook');
 }
 
 async function exportLibraryPdf() {
@@ -2820,7 +2820,7 @@ async function exportLibraryPdf() {
     });
   });
   const blob = canvasesToPdf(canvases, { title: '笔记资料库' });
-  await shareOrDownload(blob, '笔记资料库.pdf');
+  await shareOrDownload(blob, '笔记资料库 ' + new Date().toISOString().slice(0, 10) + '.pdf');
 }
 
 async function handleImport(file) {
