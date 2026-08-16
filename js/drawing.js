@@ -180,21 +180,25 @@ export function drawTextItem(ctx, t, font, w, h) {
   const lines = wrapText(ctx, t.text, t.w * w);
   let y = t.y * h;
   const lh = t.fontSize * (t.lh || 1.3);
+  let listIdx = 1;
   for (const ln of lines) {
+    let disp = ln;
+    if (t.list === 'bullet') disp = '• ' + ln;
+    else if (t.list === 'number') { disp = listIdx + '. ' + ln; listIdx++; }
     let x = t.x * w;
-    if (t.align === 'center') x += (t.w * w - ctx.measureText(ln).width) / 2;
-    else if (t.align === 'right') x += t.w * w - ctx.measureText(ln).width;
+    if (t.align === 'center') x += (t.w * w - ctx.measureText(disp).width) / 2;
+    else if (t.align === 'right') x += t.w * w - ctx.measureText(disp).width;
     if (t.hl) {
-      const hwd = ctx.measureText(ln).width;
+      const hwd = ctx.measureText(disp).width;
       ctx.save();
       ctx.globalAlpha = 0.45;
       ctx.fillStyle = t.hl;
       ctx.fillRect(x - 2, y - 1, hwd + 4, t.fontSize * 1.18);
       ctx.restore();
     }
-    ctx.fillText(ln, x, y);
+    ctx.fillText(disp, x, y);
     if (t.underline) {
-      const wd = ctx.measureText(ln).width;
+      const wd = ctx.measureText(disp).width;
       ctx.strokeStyle = t.color;
       ctx.lineWidth = Math.max(1, t.fontSize * 0.06);
       ctx.beginPath();

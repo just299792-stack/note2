@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.67';
+const APP_VERSION = '5.68';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -739,6 +739,7 @@ function attachTextStyleBar(ta, item) {
     });
     [['left', '左'], ['center', '中'], ['right', '右']].forEach(([v, l]) => mk(l, 'ts-align ' + (item.align === v ? 'active' : ''), () => { item.align = v; render(); }));
     [['1.1', '紧凑'], ['1.3', '标准'], ['1.6', '宽松']].forEach(([v, l]) => mk(l, 'ts-lh ' + ((item.lh || 1.3) === parseFloat(v) ? 'active' : ''), () => { item.lh = parseFloat(v); ta.style.lineHeight = String(item.lh); render(); }));
+    [['bullet', '•'], ['number', '1.'], ['', '×']].forEach(([v, l]) => mk(l, 'ts-list ' + ((item.list || '') === v ? 'active' : ''), () => { item.list = v || null; render(); }));
   };
   render();
   layer.appendChild(bar);
