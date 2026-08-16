@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.53';
+const APP_VERSION = '5.54';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -24,7 +24,7 @@ function currentFont() {
 
 const PEN_COLORS = ['#1e293b','#0f172a','#475569','#94a3b8','#ffffff','#dc2626','#ea580c','#d97706','#16a34a','#0891b2','#2563eb','#7c3aed','#db2777'];
 const HL_COLORS = ['#fde047','#fef08a','#fdba74','#fca5a5','#86efac','#5eead4','#7dd3fc','#c4b5fd','#f9a8d4','#fda4af'];
-const PAPER_STYLES = [ { id: 'blank', name: '空白' }, { id: 'line', name: '横线' }, { id: 'grid', name: '方格' }, { id: 'dot', name: '点阵' }, { id: 'cornell', name: '康奈尔' } ];
+const PAPER_STYLES = [ { id: 'blank', name: '空白' }, { id: 'line', name: '横线' }, { id: 'grid', name: '方格' }, { id: 'dot', name: '点阵' }, { id: 'cornell', name: '康奈尔' }, { id: 'check', name: '清单' }, { id: 'planner', name: '计划表' }, { id: 'story', name: '故事板' }, { id: 'music', name: '乐谱' }, { id: 'legal', name: '法律纸' } ];
 const PAPER_COLORS = ['white', 'cream', 'grey', 'black', 'blue', 'green'];
 const ACCENTS = { blue: '#2563eb', purple: '#7c3aed', pink: '#db2777', green: '#16a34a', orange: '#ea580c', slate: '#475569' };
 
@@ -1191,7 +1191,7 @@ function updatePaperUI() {
     const b = document.createElement('button');
     b.className = 'paper-style' + (note.paper.style === st.id ? ' active' : '');
     b.title = st.name;
-    if (st.id !== 'blank') { const cls = st.id === 'line' ? 'lines' : st.id === 'grid' ? 'grid' : st.id === 'cornell' ? 'cornell' : 'dots'; b.innerHTML = `<div class="${cls}"></div>`; }
+    if (st.id !== 'blank') { const cls = ({ line: 'lines', grid: 'grid', cornell: 'cornell', dot: 'dots', check: 'checks', planner: 'planners', story: 'storys', music: 'musics', legal: 'legals' })[st.id] || 'dots'; b.innerHTML = `<div class="${cls}"></div>`; }
     b.addEventListener('click', () => setPaper(st.id, note.paper.color));
     styles.appendChild(b);
   }

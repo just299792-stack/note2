@@ -267,6 +267,14 @@ button:disabled { opacity: .35; pointer-events: none; }
 .paper-style .lines { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 14px, rgba(147,197,253,.8) 14px 15px); }
 .paper-style .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(147,197,253,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(147,197,253,.7) 1px, transparent 1px); background-size: 10px 10px; }
 .paper-style .dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(147,197,253,.9) 1.2px, transparent 1.4px); background-size: 12px 12px; }
+.paper-style .checks { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 11px, rgba(147,197,253,.55) 11px 12px); }
+.paper-style .checks::before { content: ''; position: absolute; left: 5px; top: 4px; width: 7px; height: 7px; border: 1.5px solid rgba(147,197,253,.9); border-radius: 2px; }
+.paper-style .planners { position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(147,197,253,.5) 1px, transparent 1px); background-size: 12px 100%; }
+.paper-style .planners::before { content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 1px; background: rgba(147,197,253,.7); }
+.paper-style .storys { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 24px, rgba(147,197,253,.5) 24px 25px); }
+.paper-style .storys::before { content: ''; position: absolute; left: 0; right: 0; top: 24px; bottom: 24px; border: 1px solid rgba(147,197,253,.7); }
+.paper-style .musics { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 8px, rgba(147,197,253,.6) 8px 9px, transparent 9px 22px); }
+.paper-style .legals { position: absolute; inset: 0; background: repeating-linear-gradient(transparent 0 11px, rgba(147,197,253,.55) 11px 12px); }
 .paper-colors { display: flex; gap: 8px; padding: 0 10px 8px; }
 .paper-color { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(0,0,0,.14); }
 .paper-color.active { box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent); }
