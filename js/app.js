@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.94';
+const APP_VERSION = '5.95';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1225,6 +1225,7 @@ function toggleMarkupMode(on) {
   renderPaperStack();
   engine.resize();
   saveLibrary(state.lib);
+  toast(on ? '已进入批注模式（专注当前页，再点一次退出）' : '已退出批注模式');
 }
 
 function updatePaperUI() {
