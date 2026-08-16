@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.43';
+const APP_VERSION = '5.44';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3397,15 +3397,54 @@ async function exportNoteRtf() {
 }
 
 /* ---------------- 模板化新建（Notability 新建流程） ---------------- */
+/* ---- 内置模板（新建笔记菜单） ---- */
+const BUILTIN_TEMPLATES = [
+  { id: 'bt-course', name: '课程笔记', paper: { style: 'line', color: 'white' }, title: '课程笔记', sub: '科目：　　　　日期：　　　　', titleSize: 32, subSize: 15 },
+  { id: 'bt-meeting', name: '会议纪要', paper: { style: 'cornell', color: 'white' }, title: '会议纪要', sub: '主题 / 日期 / 参会人', titleSize: 32, subSize: 15 },
+  { id: 'bt-reading', name: '读书笔记', paper: { style: 'line', color: 'cream' }, title: '读书笔记', sub: '书名：　　　　作者：　　　　', titleSize: 30, subSize: 15 },
+  { id: 'bt-weekly', name: '周计划', paper: { style: 'checklist', color: 'white' }, title: '本周计划', sub: '第　　周　日期：　　　　', titleSize: 30, subSize: 15 },
+  { id: 'bt-todo', name: '待办清单', paper: { style: 'checklist', color: 'white' }, title: '待办事项', sub: null, titleSize: 30, subSize: 0 }
+];
+
+function createNoteFromBuiltin(tpl) {
+  const d = new Date();
+  const autoTitle = tpl.name + ' · ' + (d.getMonth() + 1) + '/' + d.getDate();
+  const note = newNote(state.activeNotebookId || firstNotebookId(), autoTitle, tpl.paper);
+  applyDefaultPageSize(note);
+  const texts = [];
+  texts.push({ id: newId(), x: 0.12, y: 0.05, w: 0.76, h: 0.09, text: tpl.title, fontSize: tpl.titleSize || 32, color: '#1e293b', align: 'center', bold: true, italic: false, underline: false, hl: null });
+  if (tpl.sub) texts.push({ id: newId(), x: 0.15, y: 0.165, w: 0.7, h: 0.05, text: tpl.sub, fontSize: tpl.subSize || 15, color: '#64748b', align: 'center', bold: false, italic: false, underline: false, hl: null });
+  note.pages[0].texts = texts;
+  state.lib.notes[note.id] = note;
+  let nb = findNotebook(state.lib, note.notebookId);
+  if (!nb) {
+    const subj = findActiveSubject() || state.lib.subjects[0];
+    if (!subj) { toast('请先创建项目'); return; }
+    const nbObj = { id: newId(), name: '我的笔记本', noteIds: [] };
+    subj.notebooks.push(nbObj);
+    note.notebookId = nbObj.id;
+    nb = { subject: subj, notebook: nbObj };
+  }
+  nb.notebook.noteIds.push(note.id);
+  state.activeSubjectId = nb.subject.id;
+  state.activeNotebookId = nb.notebook.id;
+  saveLibrary(state.lib);
+  openNote(note.id);
+  renderLibrary();
+  toast('已用「' + tpl.name + '」模板新建笔记');
+}
+
 function openNewNoteMenu() {
   const tpls = state.lib.settings.templates || [];
-  const body = '<button class="menu-item" data-new="blank">空白笔记</button>' +
-    (tpls.length ? tpls.map(t => `<button class="menu-item" data-new="${t.id}"><span class="tpl-preview" style="background:${paperInfo(t.paper.color).bg}"></span>${escapeHtml(t.name)}</button>`).join('') : '');
+  let body = '<div class="menu-sec-title">空白</div><button class="menu-item" data-new="blank">空白笔记</button>';
+  body += '<div class="menu-sec-title">内置模板</div>' + BUILTIN_TEMPLATES.map(t => '<button class="menu-item" data-bt="' + t.id + '"><span class="tpl-preview" style="background:' + paperInfo(t.paper.color).bg + '"></span>' + escapeHtml(t.name) + '</button>').join('');
+  if (tpls.length) body += '<div class="menu-sec-title">我的模板</div>' + tpls.map(t => '<button class="menu-item" data-new="' + t.id + '"><span class="tpl-preview" style="background:' + paperInfo(t.paper.color).bg + '"></span>' + escapeHtml(t.name) + '</button>').join('');
   modalShell('新建笔记', body, [{ label: '取消' }]);
   const mask = document.querySelector('#modalRoot .modal-mask');
   if (!mask) return;
-  mask.querySelectorAll('[data-new]').forEach(b => b.addEventListener('click', () => {
+  mask.querySelectorAll('[data-new],[data-bt]').forEach(b => b.addEventListener('click', () => {
     closeModal();
+    if (b.dataset.bt) { const t = BUILTIN_TEMPLATES.find(x => x.id === b.dataset.bt); if (t) createNoteFromBuiltin(t); return; }
     if (b.dataset.new === 'blank') createNote();
     else {
       const t = state.lib.settings.templates.find(x => x.id === b.dataset.new);
@@ -4298,6 +4337,7 @@ async function playRecording(item, startSec) {
             state.pageIndex = idx;
             engine.setPage(currentPage());
             engine.invalidateRaster();
+            renderPaperStack();
             updatePageNav();
           }
         }
