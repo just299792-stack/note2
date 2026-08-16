@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.37';
+const APP_VERSION = '5.38';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1258,6 +1258,17 @@ function renderSettings() {
         renderPaperStack();
         saveSoon(true);
       };
+    }
+  }
+  // 本地存储占用
+  const stRow = $('#storageRow');
+  if (stRow) {
+    const infoEl = stRow.querySelector('.storage-info');
+    if (infoEl && navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(r => {
+        const mb = ((r && r.usage) || 0) / 1024 / 1024;
+        infoEl.textContent = mb.toFixed(1) + ' MB';
+      }).catch(() => {});
     }
   }
   // 当前笔记行距
