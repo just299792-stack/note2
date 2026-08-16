@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.81';
+const APP_VERSION = '5.82';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2831,6 +2831,8 @@ async function handleImport(file) {
     if (data && data.format === 'note2' && data.type === 'note' && data.note) notes = [data.note];
     else if (data && data.format === 'note2' && data.type === 'library' && data.library && data.library.notes) notes = Object.values(data.library.notes);
     if (!notes.length) { toast('无法识别的笔记文件'); return; }
+    // 导入前自动备份当前资料库（保障旧数据）
+    try { await saveSnapshot(state.lib); } catch (_) {}
     // 重新生成 id 防止冲突
     const fresh = notes.map(cloneNoteWithNewIds);
     const subj = { id: newId(), name: '导入的笔记 · ' + new Date().toLocaleDateString('zh-CN'), notebooks: [] };
