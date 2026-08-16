@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.42';
+const APP_VERSION = '5.43';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -56,6 +56,8 @@ let saveTimer = null;
 /* ---------------- 工具 ---------------- */
 function currentNote() { return state.lib && state.activeNoteId ? state.lib.notes[state.activeNoteId] : null; }
 function currentPage() { const n = currentNote(); return n ? n.pages[state.pageIndex] : null; }
+function pageW() { const p = currentPage(); return (p && p.pageW) || PAGE_W; }
+function pageH() { const p = currentPage(); return (p && p.pageH) || PAGE_H; }
 function settings() {
   return {
     tool: state.tool, color: state.color, shape: state.shape,
@@ -74,6 +76,7 @@ let _zoomSaveTimer = 0;
 const engine = new DrawingEngine($('#viewCanvas'), {
   getPage: () => currentPage(),
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
+  getPageSize: () => { const n = currentNote(); return { w: (n && n.pageW) || PAGE_W, h: (n && n.pageH) || PAGE_H }; },
   getSettings: settings,
   getFont: () => currentFont(),
   onStrokeDone: (st, holdMs) => {
@@ -114,8 +117,8 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     const page = currentPage();
     if (page) {
       const hit = page.texts.find(t =>
-        w.x >= t.x * PAGE_W && w.x <= (t.x + t.w) * PAGE_W &&
-        w.y >= t.y * PAGE_H && w.y <= (t.y + t.h) * PAGE_H
+        w.x >= t.x * pageW() && w.x <= (t.x + t.w) * pageW() &&
+        w.y >= t.y * pageH() && w.y <= (t.y + t.h) * pageH()
       );
       if (hit) { editTextItem(hit); return; }
     }
@@ -345,7 +348,7 @@ function maybeAutoAdvance(st) {
   if (!st || st.shape) return;
   let maxY = 0;
   for (const p of st.points) maxY = Math.max(maxY, p.y);
-  if (maxY < PAGE_H * 0.94) return;
+  if (maxY < pageH() * 0.94) return;
   const note = currentNote();
   if (!note) return;
   if (state.pageIndex >= note.pages.length - 1) {
@@ -733,7 +736,7 @@ function createTextEdit(world) {
   const fontSize = state.lib.settings.textSize || 26;
   const color = state.color;
   const pres = (state.lib.settings.textPresets && state.lib.settings.textPresets[1]) || {};
-  const item = { id: newId(), x: world.x / PAGE_W, y: world.y / PAGE_H, w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline, hl: null };
+  const item = { id: newId(), x: world.x / pageW(), y: world.y / pageH(), w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline, hl: null };
   const layer = $('#textLayer');
   const ta = document.createElement('textarea');
   ta.className = 'text-edit';
@@ -741,7 +744,7 @@ function createTextEdit(world) {
   const scale = engine.scale;
   ta.style.left = sp.x + 'px';
   ta.style.top = sp.y + 'px';
-  ta.style.width = Math.max(120, 0.3 * PAGE_W * scale) + 'px';
+  ta.style.width = Math.max(120, 0.3 * pageW() * scale) + 'px';
   ta.style.minHeight = Math.round(fontSize * 1.4 * scale) + 'px';
   ta.style.fontSize = Math.round(fontSize * scale) + 'px';
   ta.style.color = color;
@@ -764,8 +767,8 @@ function createTextEdit(world) {
     for (const ln of lines) maxW = Math.max(maxW, mctx.measureText(ln).width);
     const pad = 10;
     item.text = text;
-    item.w = Math.max(0.12, (maxW + pad * 2) / PAGE_W);
-    item.h = (lines.length * fontSize * 1.3 + pad * 2) / PAGE_H;
+    item.w = Math.max(0.12, (maxW + pad * 2) / pageW());
+    item.h = (lines.length * fontSize * 1.3 + pad * 2) / pageH();
     mutate(() => currentPage().texts.push(item), '文字');
   };
   ta.addEventListener('blur', finish);
@@ -781,12 +784,12 @@ function editTextItem(item) {
   const layer = $('#textLayer');
   const ta = document.createElement('textarea');
   ta.className = 'text-edit';
-  const sp = engine.worldToScreen(item.x * PAGE_W, item.y * PAGE_H);
+  const sp = engine.worldToScreen(item.x * pageW(), item.y * pageH());
   const scale = engine.scale;
   ta.style.left = sp.x + 'px';
   ta.style.top = sp.y + 'px';
-  ta.style.width = Math.max(120, item.w * PAGE_W * scale) + 'px';
-  ta.style.minHeight = Math.round(item.h * PAGE_H * scale) + 'px';
+  ta.style.width = Math.max(120, item.w * pageW() * scale) + 'px';
+  ta.style.minHeight = Math.round(item.h * pageH() * scale) + 'px';
   ta.style.fontSize = Math.round(item.fontSize * scale) + 'px';
   ta.style.color = item.color;
   ta.value = item.text;
@@ -813,8 +816,8 @@ function editTextItem(item) {
     const pad = 10;
     mutate(() => {
       item.text = text;
-      item.w = Math.max(0.12, (maxW + pad * 2) / PAGE_W);
-      item.h = (lines.length * item.fontSize * 1.3 + pad * 2) / PAGE_H;
+      item.w = Math.max(0.12, (maxW + pad * 2) / pageW());
+      item.h = (lines.length * item.fontSize * 1.3 + pad * 2) / pageH();
     }, '编辑文字');
   };
   ta.addEventListener('blur', finish);
@@ -1127,6 +1130,38 @@ function refreshTitleMeta() {
   $('#titleMeta').textContent = `${pages} 页 · ${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}` + (state.saving ? ' · 保存中…' : '');
 }
 
+const PAGE_SIZES = { standard: { w: 816, h: 1056, name: '标准' }, wide: { w: 1056, h: 816, name: '宽版' } };
+function applyDefaultPageSize(note) {
+  const key = state.lib.settings.defaultPageSize === 'wide' ? 'wide' : 'standard';
+  const sz = PAGE_SIZES[key];
+  note.pageW = sz.w; note.pageH = sz.h;
+}
+function setPageSize(size) {
+  const note = currentNote();
+  if (!note) return;
+  const target = PAGE_SIZES[size] || PAGE_SIZES.standard;
+  const fromW = note.pageW || PAGE_W, fromH = note.pageH || PAGE_H;
+  state.lib.settings.defaultPageSize = size;
+  if (fromW === target.w && fromH === target.h) { saveSoon(); renderSettings(); return; }
+  const sx = target.w / fromW, sy = target.h / fromH;
+  for (const p of note.pages) {
+    for (const st of p.strokes) for (const pt of st.points) { pt.x *= sx; pt.y *= sy; }
+    for (const t of p.texts) { t.x *= sx; t.y *= sy; t.w *= sx; t.h *= sy; }
+    for (const im of (p.images || [])) { im.x *= sx; im.y *= sy; im.w *= sx; im.h *= sy; }
+  }
+  note.pageW = target.w; note.pageH = target.h;
+  engine.setPage(currentPage());
+  engine.fitView();
+  engine.invalidateRaster();
+  renderPaperStack();
+  renderPages();
+  renderLibrary();
+  updatePaperUI();
+  renderSettings();
+  saveSoon(true);
+  toast('已切换纸张大小：' + target.name);
+}
+
 function updatePaperUI() {
   const note = currentNote();
   if (!note) return;
@@ -1389,6 +1424,20 @@ function renderSettings() {
       b.textContent = label;
       b.addEventListener('click', () => { st.toolbar = v; saveLibrary(state.lib); applyToolbarLayout(); renderSettings(); });
       pos.appendChild(b);
+    });
+  }
+  // 纸张大小（当前笔记）
+  const psz = $('#pageSizeRow');
+  if (psz) {
+    psz.innerHTML = '';
+    const note = currentNote();
+    const cur = note ? ((note.pageW || PAGE_W) > (note.pageH || PAGE_H) ? 'wide' : 'standard') : (st.defaultPageSize || 'standard');
+    [['standard', '标准'], ['wide', '宽版']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = cur === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => setPageSize(v));
+      psz.appendChild(b);
     });
   }
   // 双指轻点手势
@@ -1737,7 +1786,7 @@ function renderRecentNotes() {
     coverEl.style.background = paperInfo(r.note.paper.color).bg;
     if (r.note.pages && r.note.pages[0]) {
       const cv = document.createElement('canvas');
-      renderPageToCanvas(cv, r.note.pages[0], r.note.paper, 90, currentFont());
+      renderPageToCanvas(cv, r.note.pages[0], r.note.paper, 90, currentFont(), r.note.pageW, r.note.pageH);
       coverEl.appendChild(cv);
     }
     if (r.note.colorTag) {
@@ -1822,7 +1871,7 @@ function renderNoteList() {
     coverEl.style.background = cov.bg;
     if (note.pages && note.pages[0]) {
       const cv = document.createElement('canvas');
-      renderPageToCanvas(cv, note.pages[0], note.paper, 90, currentFont());
+      renderPageToCanvas(cv, note.pages[0], note.paper, 90, currentFont(), note.pageW, note.pageH);
       coverEl.appendChild(cv);
     }
     if (note.pinned) {
@@ -1961,6 +2010,7 @@ function createNote() {
   const d = new Date();
   const autoTitle = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const note = newNote(state.activeNotebookId || firstNotebookId(), autoTitle, state.lib.settings.defaultPaper || { style: 'line', color: 'white' });
+  applyDefaultPageSize(note);
   state.lib.notes[note.id] = note;
   let nb = findNotebook(state.lib, note.notebookId);
   if (!nb) {
@@ -2246,7 +2296,7 @@ function refreshThumbs() {
   const list = $('#pagesList');
   [...list.children].forEach((el, i) => {
     const cv = el.querySelector('canvas');
-    if (cv && note.pages[i]) renderPageToCanvas(cv, note.pages[i], note.paper, 160, currentFont());
+    if (cv && note.pages[i]) renderPageToCanvas(cv, note.pages[i], note.paper, 160, currentFont(), note.pageW, note.pageH);
     el.classList.toggle('active', i === state.pageIndex);
   });
 }
@@ -2273,6 +2323,7 @@ function renderPaperStack(keepScroll) {
     const slot = document.createElement('div');
     slot.className = 'paper-slot' + (i === state.pageIndex ? ' current' : '');
     slot.dataset.i = String(i);
+    slot.style.aspectRatio = ((note.pageW || PAGE_W) + ' / ' + (note.pageH || PAGE_H));
     if (i === state.pageIndex) {
       if (_vcCache && _vcCache.parentElement !== slot) slot.appendChild(_vcCache);
       if (_tlCache && _tlCache.parentElement !== slot) slot.appendChild(_tlCache);
@@ -2283,7 +2334,7 @@ function renderPaperStack(keepScroll) {
     } else {
       if (Math.abs(i - state.pageIndex) <= 2) {
         const cv = document.createElement('canvas');
-        renderPageToCanvas(cv, page, note.paper, 640, currentFont());
+        renderPageToCanvas(cv, page, note.paper, 640, currentFont(), note.pageW, note.pageH);
         slot.appendChild(cv);
       } else {
         slot.classList.add('placeholder');
@@ -2316,7 +2367,7 @@ function renderPages() {
     const btn = document.createElement('button');
     btn.className = 'page-thumb' + (i === state.pageIndex ? ' active' : '');
     const cv = document.createElement('canvas');
-    renderPageToCanvas(cv, page, note.paper, 160, currentFont());
+    renderPageToCanvas(cv, page, note.paper, 160, currentFont(), note.pageW, note.pageH);
     btn.appendChild(cv);
     const num = document.createElement('span');
     num.className = 'pt-num';
@@ -2461,7 +2512,7 @@ async function exportPagePng() {
   const note = currentNote();
   if (!note || !currentPage()) return;
   const cv = document.createElement('canvas');
-  renderPageToCanvas(cv, currentPage(), note.paper, 1224, currentFont());
+  renderPageToCanvas(cv, currentPage(), note.paper, 1224, currentFont(), note.pageW, note.pageH);
   const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
   if (!blob) { toast('导出失败'); return; }
   await shareOrDownload(blob, safeName(note.title) + '-第' + (state.pageIndex + 1) + '页.png');
@@ -2497,7 +2548,7 @@ async function exportPdf() {
   const total = note.pages.length;
   const canvases = note.pages.map((page, i) => {
     const cv = document.createElement('canvas');
-    renderPageToCanvas(cv, page, note.paper, 1224, currentFont());
+    renderPageToCanvas(cv, page, note.paper, 1224, currentFont(), note.pageW, note.pageH);
     return withPdfHeader(cv, note.title, i, total);
   });
   const blob = canvasesToPdf(canvases, { title: note.title });
@@ -2957,7 +3008,7 @@ function renderPresPage() {
   const stage = $('#presStage');
   const cv = $('#presCanvas');
   const ww = window.innerWidth * 0.94, wh = window.innerHeight * 0.9;
-  const ratio = PAGE_W / PAGE_H;
+  const ratio = pageW() / pageH();
   let w = ww, h = w / ratio;
   if (h > wh) { h = wh; w = h * ratio; }
   w = Math.round(w); h = Math.round(h);
@@ -2965,7 +3016,7 @@ function renderPresPage() {
   stage.style.height = h + 'px';
   cv.style.width = w + 'px';
   cv.style.height = h + 'px';
-  renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), currentFont());
+  renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), currentFont(), note.pageW, note.pageH);
   const lz = $('#presLaser');
   if (lz) { lz.width = w; lz.height = h; const lc = lz.getContext('2d'); lc.clearRect(0, 0, w, h); }
   presStrokes = []; presCur = null; renderPresMark();
@@ -3090,7 +3141,7 @@ function pasteSelection() {
   mutate(() => {
     for (const st of clipboard.strokes) {
       const c = JSON.parse(JSON.stringify(st)); c.id = newId();
-      for (const pt of c.points) { pt.x += dx * PAGE_W; pt.y += dy * PAGE_H; }
+      for (const pt of c.points) { pt.x += dx * pageW(); pt.y += dy * pageH(); }
       page.strokes.push(c);
     }
     for (const t of clipboard.texts) { const c = JSON.parse(JSON.stringify(t)); c.id = newId(); c.x += dx; c.y += dy; page.texts.push(c); }
@@ -3569,6 +3620,7 @@ function newNoteFromTemplate(tpl) {
   const d = new Date();
   const title = tpl.name + ' · ' + `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const note = newNote(state.activeNotebookId || firstNotebookId(), title, tpl.paper || { style: 'line', color: 'white' });
+  applyDefaultPageSize(note);
   if (tpl.bg) note.pages[0].bg = JSON.parse(JSON.stringify(tpl.bg));
   state.lib.notes[note.id] = note;
   let nb = findNotebook(state.lib, note.notebookId);
@@ -4424,7 +4476,7 @@ async function init() {
   // 调试句柄（供测试/排查使用）
   window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
-    renderFavorites, insertImage, openScanner, addScanFile, importPdf, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
+    renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
     addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection,
     deletePageAt, clearBlankPages,

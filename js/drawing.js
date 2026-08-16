@@ -404,16 +404,18 @@ export function drawShape(ctx, st) {
 }
 
 /** 把一页渲染到指定画布（用于缩略图 / PDF） */
-export function renderPageToCanvas(canvas, page, paper, targetW, font) {
-  const rs = targetW / PAGE_W;
-  canvas.width = Math.round(PAGE_W * rs);
-  canvas.height = Math.round(PAGE_H * rs);
+export function renderPageToCanvas(canvas, page, paper, targetW, font, sizeW, sizeH) {
+  const pw = (sizeW || (page && page.pageW)) || PAGE_W;
+  const ph = (sizeH || (page && page.pageH)) || PAGE_H;
+  const rs = targetW / pw;
+  canvas.width = Math.round(pw * rs);
+  canvas.height = Math.round(ph * rs);
   const ctx = canvas.getContext('2d');
   ctx.setTransform(rs, 0, 0, rs, 0, 0);
-  const info = drawPaper(ctx, paper.style, paper.color, PAGE_W, PAGE_H, paper.spacing || 'normal');
-  drawPageMedia(ctx, page, PAGE_W, PAGE_H, null);
+  const info = drawPaper(ctx, paper.style, paper.color, pw, ph, paper.spacing || 'normal');
+  drawPageMedia(ctx, page, pw, ph, null);
   for (const st of page.strokes) drawStroke(ctx, st, info, font);
-  for (const t of page.texts) drawTextItem(ctx, t, font, PAGE_W, PAGE_H);
+  for (const t of page.texts) drawTextItem(ctx, t, font, pw, ph);
   return canvas;
 }
 
@@ -427,6 +429,7 @@ export class DrawingEngine {
     this.raster = document.createElement('canvas');
     this.rctx = this.raster.getContext('2d');
     this.scale = 0.6; this.ox = 0; this.oy = 0;
+    this.pageW = PAGE_W; this.pageH = PAGE_H;
     this.dirtyRaster = true; this.dirtyView = true;
     this.page = null;
     this.pointers = new Map();
@@ -491,10 +494,10 @@ export class DrawingEngine {
 
   fitView() {
     const pad = 40;
-    const s = Math.min((this.cw - pad * 2) / PAGE_W, (this.ch - pad * 2) / PAGE_H);
+    const s = Math.min((this.cw - pad * 2) / this.pageW, (this.ch - pad * 2) / this.pageH);
     this.scale = Math.max(0.2, Math.min(2, s));
-    this.ox = (this.cw - PAGE_W * this.scale) / 2;
-    this.oy = (this.ch - PAGE_H * this.scale) / 2;
+    this.ox = (this.cw - this.pageW * this.scale) / 2;
+    this.oy = (this.ch - this.pageH * this.scale) / 2;
     this.dirtyView = true;
   }
 
@@ -863,11 +866,11 @@ export class DrawingEngine {
       }
     }
     for (const t of this.page.texts) {
-      const box = { x: t.x * PAGE_W, y: t.y * PAGE_H, w: t.w * PAGE_W, h: t.h * PAGE_H };
+      const box = { x: t.x * this.pageW, y: t.y * this.pageH, w: t.w * this.pageW, h: t.h * this.pageH };
       if (this.polyIntersectsBox(path, box)) ids.add('t:' + t.id);
     }
     for (const im of this.page.images || []) {
-      const box = { x: im.x * PAGE_W, y: im.y * PAGE_H, w: im.w * PAGE_W, h: im.h * PAGE_H };
+      const box = { x: im.x * this.pageW, y: im.y * this.pageH, w: im.w * this.pageW, h: im.h * this.pageH };
       if (this.polyIntersectsBox(path, box)) ids.add('i:' + im.id);
     }
     this.selection = ids.size ? { ids: [...ids], box: this.computeBox(ids), moving: false, offset: null } : null;
@@ -912,13 +915,13 @@ export class DrawingEngine {
       if (id.startsWith('i:')) {
         const im = this.page.images.find(x => x.id === id.slice(2));
         if (!im) continue;
-        minX = Math.min(minX, im.x * PAGE_W); minY = Math.min(minY, im.y * PAGE_H);
-        maxX = Math.max(maxX, (im.x + im.w) * PAGE_W); maxY = Math.max(maxY, (im.y + im.h) * PAGE_H);
+        minX = Math.min(minX, im.x * this.pageW); minY = Math.min(minY, im.y * this.pageH);
+        maxX = Math.max(maxX, (im.x + im.w) * this.pageW); maxY = Math.max(maxY, (im.y + im.h) * this.pageH);
       } else if (id.startsWith('t:')) {
         const t = this.page.texts.find(x => x.id === id.slice(2));
         if (!t) continue;
-        minX = Math.min(minX, t.x * PAGE_W); minY = Math.min(minY, t.y * PAGE_H);
-        maxX = Math.max(maxX, (t.x + t.w) * PAGE_W); maxY = Math.max(maxY, (t.y + t.h) * PAGE_H);
+        minX = Math.min(minX, t.x * this.pageW); minY = Math.min(minY, t.y * this.pageH);
+        maxX = Math.max(maxX, (t.x + t.w) * this.pageW); maxY = Math.max(maxY, (t.y + t.h) * this.pageH);
       } else {
         const st = this.page.strokes.find(x => x.id === id);
         if (!st) continue;
@@ -953,11 +956,11 @@ export class DrawingEngine {
       if (id.startsWith('i:')) {
         const im = this.page.images.find(x => x.id === id.slice(2));
         if (!im) continue;
-        im.x += dx / PAGE_W; im.y += dy / PAGE_H;
+        im.x += dx / this.pageW; im.y += dy / this.pageH;
       } else if (id.startsWith('t:')) {
         const t = this.page.texts.find(x => x.id === id.slice(2));
         if (!t) continue;
-        t.x += dx / PAGE_W; t.y += dy / PAGE_H;
+        t.x += dx / this.pageW; t.y += dy / this.pageH;
       } else {
         const st = this.page.strokes.find(x => x.id === id);
         if (!st) continue;
@@ -976,15 +979,15 @@ export class DrawingEngine {
     if (!this.page) { this.dirtyRaster = false; return; }
     const paper = this.cb.getPaper();
     const rs = RENDER_SCALE;
-    this.raster.width = PAGE_W * rs;
-    this.raster.height = PAGE_H * rs;
+    this.raster.width = this.pageW * rs;
+    this.raster.height = this.pageH * rs;
     const c = this.rctx;
     c.setTransform(rs, 0, 0, rs, 0, 0);
-    const info = drawPaper(c, paper.style, paper.color, PAGE_W, PAGE_H, paper.spacing || 'normal');
+    const info = drawPaper(c, paper.style, paper.color, this.pageW, this.pageH, paper.spacing || 'normal');
     const pid = this.page.id;
-    drawPageMedia(c, this.page, PAGE_W, PAGE_H, () => { if (this.page && this.page.id === pid) this.invalidateRaster(); });
+    drawPageMedia(c, this.page, this.pageW, this.pageH, () => { if (this.page && this.page.id === pid) this.invalidateRaster(); });
     for (const st of this.page.strokes) drawStroke(c, st, info, this.cb.getFont());
-    for (const t of this.page.texts) drawTextItem(c, t, this.cb.getFont(), PAGE_W, PAGE_H);
+    for (const t of this.page.texts) drawTextItem(c, t, this.cb.getFont(), this.pageW, this.pageH);
     this.dirtyRaster = false;
   }
 
@@ -1008,8 +1011,8 @@ export class DrawingEngine {
     const s = this.scale;
     c.setTransform(this.dpr * s, 0, 0, this.dpr * s, this.dpr * this.ox, this.dpr * this.oy);
     c.fillStyle = 'rgba(0,0,0,.13)';
-    c.fillRect(6, 8, PAGE_W, PAGE_H);
-    c.drawImage(this.raster, 0, 0, PAGE_W, PAGE_H);
+    c.fillRect(6, 8, this.pageW, this.pageH);
+    c.drawImage(this.raster, 0, 0, this.pageW, this.pageH);
     this.drawLiveInk(c);
     this.drawSelection(c);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -1077,6 +1080,9 @@ export class DrawingEngine {
   /* -------- 对外 -------- */
   setPage(page) {
     this.page = page;
+    const ps = (this.cb && this.cb.getPageSize) ? this.cb.getPageSize() : null;
+    this.pageW = (ps && ps.w) || PAGE_W;
+    this.pageH = (ps && ps.h) || PAGE_H;
     this.selection = null; this.currentStroke = null; this.lassoPath = null; this.curShape = null;
     this.clearDwell();
     this.eraseIds = new Set(); this.textTap = null; this.erasePath = null;
