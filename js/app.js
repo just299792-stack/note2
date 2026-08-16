@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.65';
+const APP_VERSION = '5.66';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3921,12 +3921,49 @@ function findInNote() {
     });
     if (!hits.length) { toast('未找到相关内容'); return; }
     const body = hits.map(h => `<div class="find-row" data-p="${h.page}"><span class="find-page">第 ${h.page + 1} 页</span><span class="find-snippet">…${escapeHtml(h.snippet)}…</span></div>`).join('');
-    modalShell('在笔记中查找 · ' + hits.length + ' 处', body, [{ label: '关闭' }]);
+    modalShell('在笔记中查找 · ' + hits.length + ' 处', body, [
+      { label: '替换…', action: () => replacePrompt(q) },
+      { label: '关闭' }
+    ]);
     const mask = document.querySelector('#modalRoot .modal-mask');
     if (mask) mask.querySelectorAll('.find-row').forEach(r => r.addEventListener('click', () => {
       closeModal();
       switchPage(Number(r.dataset.p));
     }));
+  });
+}
+
+function escapeRegExp(s) { return String(s).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&'); }
+function replaceAllInNote(q, r) {
+  const note = currentNote();
+  if (!note) return 0;
+  const ql = String(q || '').toLowerCase();
+  if (!ql) return 0;
+  const rx = new RegExp(escapeRegExp(q), 'gi');
+  let count = 0;
+  note.pages.forEach(p => {
+    (p.texts || []).forEach(t => {
+      if (t.text && t.text.toLowerCase().includes(ql)) {
+        const m = (t.text.match(rx) || []);
+        count += m.length;
+        t.text = t.text.split(rx).join(String(r == null ? '' : r));
+      }
+    });
+  });
+  if (count) {
+    engine.invalidateRaster();
+    renderPages();
+    renderPaperStack();
+    saveSoon(true);
+  }
+  return count;
+}
+function replacePrompt(q) {
+  const note = currentNote();
+  if (!note) return;
+  promptModal('替换为', '将「' + q + '」替换为：', '替换内容', '全部替换', (r) => {
+    const n = replaceAllInNote(q, r);
+    toast(n ? '已替换 ' + n + ' 处' : '没有可替换的内容');
   });
 }
 
@@ -5007,7 +5044,7 @@ async function init() {
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
     toggleReadAloud, readAloudAll, exportNoteText, notebookColor,
-    renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
+    renderLibrary, setSpacing, findInNote, replaceAllInNote, outlineNote, noteEmoji,
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
