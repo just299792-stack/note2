@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.85';
+const APP_VERSION = '5.86';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3694,6 +3694,7 @@ function bindV426UI() {
     pCv.addEventListener('dblclick', exitPresent);
     const pPen = $('#presPen');
     if (pPen) pPen.addEventListener('click', (e) => { e.stopPropagation(); presDrawOn = !presDrawOn; pPen.classList.toggle('active', presDrawOn); });
+    const pClearMark = $('#presClearMark'); if (pClearMark) pClearMark.addEventListener('click', () => { presStrokes = []; presCur = null; renderPresMark(); toast('已清除批注'); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
   document.addEventListener('keydown', (e) => {
