@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.26';
+const APP_VERSION = '5.27';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2962,6 +2962,10 @@ async function exportNoteText() {
   const note = currentNote();
   if (!note) return;
   const lines = [];
+  lines.push(note.title);
+  lines.push('导出时间：' + new Date().toLocaleString('zh-CN'));
+  lines.push('页面数：' + note.pages.length);
+  lines.push('');
   note.pages.forEach((p, i) => {
     const ts = (p.texts || []).map(t => t.text).filter(Boolean);
     if (ts.length) {
@@ -4009,8 +4013,8 @@ async function init() {
   engine.setPage(currentPage());
   engine.fitView();
   engine.invalidateRaster();
-  requestAnimationFrame(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); });
-  setTimeout(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); }, 150);
+  requestAnimationFrame(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); fitScaleRef = engine.scale; });
+  setTimeout(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); fitScaleRef = engine.scale; }, 150);
   registerSW();
   if (state.lib && state.lib.settings && state.lib.settings.paperZoom) {
     document.documentElement.style.setProperty('--paper-zoom', String(Math.max(0.5, Math.min(2.5, state.lib.settings.paperZoom))));
