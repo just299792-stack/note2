@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.92';
+const APP_VERSION = '5.93';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3394,11 +3394,11 @@ function presAdvance() {
   if (state.pageIndex < note.pages.length - 1) {
     switchPage(state.pageIndex + 1);
     renderPresPage();
-    presTimer = setTimeout(presAdvance, presInterval);
   } else {
-    presPlaying = false;
-    const pp = $('#presPlay'); if (pp) pp.textContent = '▶';
+    switchPage(0);
+    renderPresPage();
   }
+  presTimer = setTimeout(presAdvance, presInterval);
 }
 function setPresColor(key) {
   presColor = PRES_COLORS[key] || presColor;
