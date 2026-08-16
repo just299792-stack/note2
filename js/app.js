@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.73';
+const APP_VERSION = '5.74';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3365,16 +3365,22 @@ function scheduleSnapshot(immediate) {
 }
 async function openSnapshots() {
   const list = await listSnapshots();
-  if (!list.length) { toast('还没有备份快照'); return; }
-  const body = list.map(s => `
+  let body = '<div style="margin-bottom:8px"><button class="mini-btn primary" data-backup="1">立即备份</button></div>';
+  if (!list.length) {
+    body += '<div class="snap-empty">还没有备份快照，点「立即备份」保存一份。</div>';
+  } else {
+    body += list.map(s => `
     <div class="snap-row">
       <span class="snap-info">${new Date(s.ts).toLocaleString('zh-CN')} · ${s.library ? Object.keys(s.library.notes).length : 0} 篇笔记</span>
       <button class="mini-btn" data-restore="${s.id}">恢复</button>
       <button class="mini-btn danger" data-del="${s.id}">删除</button>
     </div>`).join('');
+  }
   modalShell('备份快照（最近 10 份）', body, [{ label: '关闭' }]);
   const mask = document.querySelector('#modalRoot .modal-mask');
   if (!mask) return;
+  const bk = mask.querySelector('[data-backup]');
+  if (bk) bk.addEventListener('click', async () => { await saveSnapshot(state.lib); toast('已备份'); openSnapshots(); });
   mask.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', async () => {
     const lib = await loadSnapshot(b.dataset.restore);
     if (!lib) { toast('快照不可用'); return; }
