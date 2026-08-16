@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.36';
+const APP_VERSION = '5.37';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3042,9 +3042,23 @@ let ttsActive = false;
 function toggleReadAloud() {
   const texts = ((currentPage() && currentPage().texts) || []).map(t => t.text).filter(Boolean).join('。');
   if (ttsActive) {
+    if ('speechSynthesis' in window && !window.speechSynthesis.paused) {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        toast('已暂停朗读');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      ttsActive = false;
+      toast('已停止朗读');
+      return;
+    }
+    if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      toast('继续朗读');
+      return;
+    }
     ttsActive = false;
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    toast('已停止朗读');
     return;
   }
   if (!texts) { toast('当前页没有文字'); return; }
