@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.90';
+const APP_VERSION = '5.91';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1006,6 +1006,7 @@ function bindUI() {
     if (act === 'logout') logout(true);
     if (act === 'reset-settings') resetSettings();
     if (act === 'about') aboutModal();
+    if (act === 'shortcuts') showShortcuts();
   });
   $('#optFinger').addEventListener('change', (e) => { state.lib.settings.fingerDraw = e.target.checked; saveLibrary(state.lib); });
   const o2f = $('#optTwoFinger'); if (o2f) o2f.addEventListener('change', (e) => { state.lib.settings.twoFingerUndo = e.target.checked; saveLibrary(state.lib); });
@@ -1585,6 +1586,21 @@ function renderSettings() {
   const oMarkup = $('#optMarkup'); if (oMarkup) oMarkup.checked = st.markup === true;
   const aiP = $('#aiPromptInput'); if (aiP) aiP.value = st.aiPrompt || '';
   const av = $('#appVersion'); if (av) av.textContent = APP_VERSION;
+}
+
+function showShortcuts() {
+  modalShell('快捷键一览', '<div class="stats-body" style="line-height:1.9">' +
+    '<p><b>键盘（酌/Ctrl）</b></p>' +
+    '<p>N 新建笔记 · D 复制页 · F 查找 · G 大纲</p>' +
+    '<p>A 全选当前页 · S 保存 · E 导出 · P 导出 PDF</p>' +
+    '<p>Shift+P 当前页图片 · ESC 关闭弹窗/退出演示</p>' +
+    '<p><b>手势（iPad）</b></p>' +
+    '<p>双指轻点 = 撤销 · 三指轻点 = 重做</p>' +
+    '<p>双指上下滑 = 滚动纸 · 双指左右滑 = 翻页</p>' +
+    '<p>双指捻合 = 缩放 · 写到页尾 = 自动翻页</p>' +
+    '<p><b>演示模式</b></p>' +
+    '<p>← / → / 空格 = 翻页 · ✏️ = 批注 · 双击 = 退出</p>' +
+    '</div>', [{ label: '关闭' }]);
 }
 
 function setSpacing(spacing) {
