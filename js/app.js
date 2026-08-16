@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.34';
+const APP_VERSION = '5.35';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -869,6 +869,7 @@ function bindUI() {
     if (act === 'apply-template') pickTemplateAndApply();
     if (act === 'stats') noteStats();
     if (act === 'export-text') exportNoteText();
+    if (act === 'export-rtf') exportNoteRtf();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
     if (act === 'add-page') addPage();
@@ -3078,6 +3079,32 @@ async function exportNoteText() {
   const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
   await shareOrDownload(blob, safeName(note.title) + '.txt');
 }
+async function exportNoteRtf() {
+  const note = currentNote();
+  if (!note) return;
+  const esc = (s) => [...String(s || '')].map(ch => {
+    const c = ch.charCodeAt(0);
+    if (c > 127) return '\\u' + c + '?';
+    if (ch === '\\') return '\\\\';
+    if (ch === '{') return '\\{';
+    if (ch === '}') return '\\}';
+    if (ch === '\n') return '\\par ';
+    return ch;
+  }).join('');
+  const parts = ['{\\rtf1\\ansi\\ansicpg936\\deff0', '{\\fonttbl{\\f0\\fnil\\fcharset134 Microsoft YaHei;}}', '\\f0\\fs24 '];
+  parts.push('\\pard\\b\\fs36 ' + esc(note.title) + '\\b0\\par\\par ');
+  note.pages.forEach((p, i) => {
+    const ts = (p.texts || []).map(t => t.text).filter(Boolean);
+    if (ts.length) {
+      parts.push('\\pard\\fs28 ' + esc('—— 第 ' + (i + 1) + ' 页 ——') + '\\par ');
+      ts.forEach(t => parts.push('\\pard\\fs24 ' + esc(t) + '\\par '));
+    }
+  });
+  parts.push('}');
+  const blob = new Blob([parts.join('\n')], { type: 'application/rtf' });
+  await shareOrDownload(blob, safeName(note.title) + '.rtf');
+}
+
 /* ---------------- 模板化新建（Notability 新建流程） ---------------- */
 function openNewNoteMenu() {
   const tpls = state.lib.settings.templates || [];
@@ -4138,7 +4165,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, exportNoteRtf };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
