@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.95';
+const APP_VERSION = '5.96';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4125,6 +4125,7 @@ function findInNote() {
     modalShell('在笔记中查找 · ' + hits.length + ' 处', body, [
       { label: '替换…', action: () => replacePrompt(q) },
       { label: '高亮匹配', action: () => highlightMatches(q) },
+      { label: '清除高亮', action: () => clearAllHighlights() },
       { label: '关闭' }
     ]);
     const mask = document.querySelector('#modalRoot .modal-mask');
@@ -4167,6 +4168,24 @@ function replacePrompt(q) {
     const n = replaceAllInNote(q, r);
     toast(n ? '已替换 ' + n + ' 处' : '没有可替换的内容');
   });
+}
+
+function clearAllHighlights() {
+  const note = currentNote();
+  if (!note) return;
+  let count = 0;
+  note.pages.forEach(p => {
+    (p.texts || []).forEach(t => {
+      if (t.hl) { t.hl = null; count++; }
+    });
+  });
+  if (count) {
+    engine.invalidateRaster();
+    renderPages();
+    renderPaperStack();
+    saveSoon(true);
+    toast('已清除 ' + count + ' 个高亮');
+  } else toast('没有可清除的高亮');
 }
 
 function highlightMatches(q) {
@@ -5279,7 +5298,7 @@ async function init() {
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
     toggleReadAloud, readAloudAll, exportNoteText, notebookColor,
-    renderLibrary, setSpacing, findInNote, replaceAllInNote, highlightMatches, outlineNote, noteEmoji,
+    renderLibrary, setSpacing, findInNote, replaceAllInNote, highlightMatches, clearAllHighlights, outlineNote, noteEmoji,
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
