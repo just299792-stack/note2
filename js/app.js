@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.23';
+const APP_VERSION = '5.24';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2142,8 +2142,63 @@ function renderPages() {
       }
     }
     btn.addEventListener('click', () => switchPage(i));
+    // 拖拽排序
+    let dragState = null;
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (state.multi.on) return;
+      if (e.target.closest('.pt-move') || e.target.closest('.pt-del')) return;
+      e.preventDefault();
+      const r = btn.getBoundingClientRect();
+      const ghost = btn.cloneNode(true);
+      ghost.className = 'page-thumb ghost';
+      ghost.style.position = 'fixed';
+      ghost.style.width = r.width + 'px';
+      ghost.style.left = r.left + 'px';
+      ghost.style.top = r.top + 'px';
+      ghost.style.zIndex = 999;
+      ghost.style.margin = '0';
+      document.body.appendChild(ghost);
+      btn.classList.add('dragging');
+      dragState = { from: i, y0: e.clientY, ghost, id: e.pointerId, startTop: r.top, target: i };
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    btn.addEventListener('pointermove', (e) => {
+      if (!dragState || dragState.id !== e.pointerId) return;
+      const dy = e.clientY - dragState.y0;
+      dragState.ghost.style.top = (dragState.startTop + dy) + 'px';
+      const lr = list.getBoundingClientRect();
+      const thumbH = btn.offsetHeight + 10;
+      const target = Math.max(0, Math.min(note.pages.length - 1, Math.round((e.clientY - lr.top) / thumbH)));
+      dragState.target = target;
+    });
+    const endDrag = () => {
+      if (!dragState) return;
+      const from = dragState.from, target = dragState.target;
+      if (dragState.ghost) dragState.ghost.remove();
+      btn.classList.remove('dragging');
+      dragState = null;
+      if (from !== target) reorderPage(from, target);
+    };
+    btn.addEventListener('pointerup', endDrag);
+    btn.addEventListener('pointercancel', endDrag);
     list.appendChild(btn);
   });
+}
+
+function reorderPage(from, to) {
+  const note = currentNote();
+  if (!note || from === to || to < 0 || to >= note.pages.length) return;
+  const before = note.pages.slice();
+  const arr = note.pages.slice();
+  const [p] = arr.splice(from, 1);
+  arr.splice(to, 0, p);
+  pushHistory('移动页面',
+    () => { note.pages = before; afterPageArrayRestore(); },
+    () => { note.pages = arr; afterPageArrayRestore(); });
+  note.pages = arr;
+  state.pageIndex = to;
+  applyPagesChange();
 }
 
 function movePage(from, dir) {

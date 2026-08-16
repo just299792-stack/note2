@@ -1158,3 +1158,6 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 .pres-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 #presLaser { pointer-events: none; border-radius: 6px; }
 .pres-mode canvas { max-width: none; max-height: none; }
+
+.page-thumb.dragging { opacity: .35; }
+.page-thumb.ghost { opacity: .92; box-shadow: 0 14px 34px rgba(0,0,0,.35); cursor: grabbing; pointer-events: none; }
