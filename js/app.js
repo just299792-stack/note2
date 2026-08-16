@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.66';
+const APP_VERSION = '5.67';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2695,7 +2695,7 @@ async function exportPdf() {
   let rStart = 1, rEnd = total;
   if (total > 1) {
     rStart = await new Promise((resolve) => {
-      modalShell('导出页范围', '<input id="pdfExpRange" class="pdf-range" value="1-' + total + '" placeholder="如 1-10 或全部">', [
+      modalShell('导出页范围', '<input id="pdfExpRange" class="pdf-range" value="1-' + total + '" placeholder="如 1-10 或全部"><label class="toggle-row" style="margin-top:10px"><span>添加封面页</span><input type="checkbox" id="pdfCover" checked></label>', [
         { label: '取消', action: (mask) => { closeModal(); resolve(-1); } },
         { label: '导出', primary: true, action: (mask) => {
           const v = (document.querySelector('#pdfExpRange') || {}).value || '';
@@ -2703,6 +2703,7 @@ async function exportPdf() {
           let a = 1, b = total;
           if (parts.length === 2 && parts[0] > 0 && parts[1] >= parts[0]) { a = parts[0]; b = Math.min(parts[1], total); }
           else if (parts.length === 1 && parts[0] > 0) { a = b = Math.min(parts[0], total); }
+          window.__pdfCover = !!((document.querySelector('#pdfCover') || {}).checked);
           closeModal();
           resolve(a);
           window.__pdfExpEnd = b;
@@ -2722,6 +2723,19 @@ async function exportPdf() {
     renderPageToCanvas(cv, note.pages[i], note.paper, 1224, currentFont(), note.pageW, note.pageH);
     return withPdfHeader(cv, note.title, i, total);
   });
+  if (window.__pdfCover) {
+    const cov = document.createElement('canvas');
+    cov.width = 1224; cov.height = 1584;
+    const cc = cov.getContext('2d');
+    cc.fillStyle = '#f8fafc'; cc.fillRect(0, 0, 1224, 1584);
+    cc.fillStyle = '#1e293b'; cc.font = 'bold 58px sans-serif'; cc.textAlign = 'center'; cc.textBaseline = 'middle';
+    cc.fillText(note.title, 612, 690);
+    cc.fillStyle = '#64748b'; cc.font = '28px sans-serif';
+    cc.fillText('导出时间：' + new Date().toLocaleString('zh-CN'), 612, 780);
+    cc.fillText('共 ' + total + ' 页', 612, 832);
+    canvases.unshift(cov);
+    delete window.__pdfCover;
+  }
   const blob = canvasesToPdf(canvases, { title: note.title });
   await shareOrDownload(blob, safeName(note.title) + '.pdf');
 }
