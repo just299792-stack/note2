@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.72';
+const APP_VERSION = '5.73';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -969,6 +969,7 @@ function bindUI() {
     if (act === 'export-page-png') exportPagePng();
     if (act === 'export-longpng') exportNoteLongImage();
     if (act === 'export-library') exportLibrary();
+    if (act === 'export-library-pdf') exportLibraryPdf();
     if (act === 'import') $('#fileInput').click();
     if (act === 'import-pdf') $('#pdfInput').click();
     if (act === 'insert-image') $('#imageInput').click();
@@ -2782,6 +2783,34 @@ async function exportLibrary() {
   const data = { format: 'note2', version: 1, type: 'library', exportedAt: new Date().toISOString(), library: state.lib };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   await shareOrDownload(blob, '笔记资料库.notebook');
+}
+
+async function exportLibraryPdf() {
+  const notes = Object.values(state.lib.notes);
+  if (!notes.length) { toast('资料库为空'); return; }
+  let total = 0; notes.forEach(n => total += n.pages.length);
+  if (total > 200) { toast('页数过多（' + total + ' 页），请分批导出'); return; }
+  toast('正在生成资料库 PDF…');
+  await new Promise(r => setTimeout(r, 30));
+  const canvases = [];
+  notes.forEach((note, ni) => {
+    const cov = document.createElement('canvas');
+    cov.width = 1224; cov.height = 1584;
+    const cc = cov.getContext('2d');
+    cc.fillStyle = '#f1f5f9'; cc.fillRect(0, 0, 1224, 1584);
+    cc.fillStyle = '#1e293b'; cc.font = 'bold 54px sans-serif'; cc.textAlign = 'center'; cc.textBaseline = 'middle';
+    cc.fillText(note.title, 612, 700);
+    cc.fillStyle = '#64748b'; cc.font = '26px sans-serif';
+    cc.fillText((ni + 1) + ' / ' + notes.length + ' · ' + note.pages.length + ' 页', 612, 780);
+    canvases.push(cov);
+    note.pages.forEach(p => {
+      const cv = document.createElement('canvas');
+      renderPageToCanvas(cv, p, note.paper, 1224, currentFont(), note.pageW, note.pageH);
+      canvases.push(cv);
+    });
+  });
+  const blob = canvasesToPdf(canvases, { title: '笔记资料库' });
+  await shareOrDownload(blob, '笔记资料库.pdf');
 }
 
 async function handleImport(file) {
@@ -5105,7 +5134,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportSelectionPng, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, openTrash, restoreNote, purgeTrash };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportSelectionPng, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, exportLibraryPdf, openTrash, restoreNote, purgeTrash };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
