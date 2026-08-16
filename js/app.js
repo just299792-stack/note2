@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.83';
+const APP_VERSION = '5.84';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3250,6 +3250,8 @@ let presClockTimer = null;
 let presStart = 0;
 let presInterval = 5000;
 const PRES_COLORS = { yellow: 'rgba(250,204,21,.55)', red: 'rgba(239,68,68,.5)', green: 'rgba(34,197,94,.5)', blue: 'rgba(59,130,246,.5)', white: 'rgba(255,255,255,.6)' };
+const PRES_LASER_RGB = { yellow: '250,204,21', red: '239,68,68', green: '34,197,94', blue: '59,130,246', white: '248,250,252' };
+let presLaserRgb = '239,68,68';
 function renderPresMark() {
   const mk = $('#presMark');
   const cv = $('#presCanvas');
@@ -3317,9 +3319,9 @@ function drawLaser(e) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, r.width, r.height);
   const g = ctx.createRadialGradient(x, y, 2, x, y, 26);
-  g.addColorStop(0, 'rgba(239,68,68,.95)');
-  g.addColorStop(0.5, 'rgba(239,68,68,.5)');
-  g.addColorStop(1, 'rgba(239,68,68,0)');
+  g.addColorStop(0, 'rgba(' + presLaserRgb + ',.95)');
+  g.addColorStop(0.5, 'rgba(' + presLaserRgb + ',.5)');
+  g.addColorStop(1, 'rgba(' + presLaserRgb + ',0)');
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.arc(x, y, 26, 0, 7); ctx.fill();
 }
@@ -3362,6 +3364,7 @@ function presAdvance() {
 }
 function setPresColor(key) {
   presColor = PRES_COLORS[key] || presColor;
+  if (PRES_LASER_RGB[key]) presLaserRgb = PRES_LASER_RGB[key];
   document.querySelectorAll('#presColors .pres-swatch').forEach(b => b.classList.toggle('active', b.dataset.c === key));
   renderPresMark();
 }
