@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.61';
+const APP_VERSION = '5.62';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3387,6 +3387,29 @@ function cropSelection() {
   img.src = im.src;
 }
 
+function exportSelectionPng() {
+  const ids = engine.getSelectionIds();
+  const box = engine.getSelectedBox();
+  const page = currentPage();
+  const note = currentNote();
+  if (!ids.length || !box || !page || !note) { toast('请先用套索选中内容'); return; }
+  const W = 1000;
+  const cv = document.createElement('canvas');
+  renderPageToCanvas(cv, page, note.paper, W, currentFont(), note.pageW, note.pageH);
+  const scale = W / ((page.pageW) || PAGE_W);
+  const x = Math.max(0, Math.floor(box.x * scale));
+  const y = Math.max(0, Math.floor(box.y * scale));
+  const w = Math.min(cv.width - x, Math.max(2, Math.ceil(box.w * scale)));
+  const h = Math.min(cv.height - y, Math.max(2, Math.ceil(box.h * scale)));
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  out.getContext('2d').drawImage(cv, x, y, w, h, 0, 0, w, h);
+  out.toBlob(async (blob) => {
+    if (!blob) { toast('导出失败'); return; }
+    await shareOrDownload(blob, safeName(note.title) + '-xuanzhong.png');
+  }, 'image/png');
+}
+
 function rotateSelection() {
   const ids = engine.getSelectionIds();
   if (!ids.length) return;
@@ -3455,6 +3478,7 @@ function bindV426UI() {
   const sCopy = $('#selCopy'); if (sCopy) sCopy.addEventListener('click', () => copySelection());
   const sRot = $('#selRotate'); if (sRot) sRot.addEventListener('click', () => rotateSelection());
   const sCrop = $('#selCrop'); if (sCrop) sCrop.addEventListener('click', () => cropSelection());
+  const sExport = $('#selExport'); if (sExport) sExport.addEventListener('click', () => exportSelectionPng());
   const sDel = $('#selDel'); if (sDel) sDel.addEventListener('click', () => deleteSelection());
   const sClose = $('#selClose'); if (sClose) sClose.addEventListener('click', () => { $('#selBar').classList.add('hidden'); engine.clearSelection(); });
   const spd = $('#recSpeed');
@@ -4956,7 +4980,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, openTrash, restoreNote, purgeTrash };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportSelectionPng, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, openTrash, restoreNote, purgeTrash };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
