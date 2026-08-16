@@ -22,13 +22,13 @@ export function newLibrary() {
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
       autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26, templates: [
-        { id: 'tpl-lecture', name: '听课笔记', paper: { style: 'cornell', color: 'white' }, bg: null, createdAt: 0 },
-        { id: 'tpl-meeting', name: '会议记录', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0 },
-        { id: 'tpl-todo', name: '待办清单', paper: { style: 'check', color: 'white' }, bg: null, createdAt: 0 },
-        { id: 'tpl-daily', name: '日程计划', paper: { style: 'planner', color: 'white' }, bg: null, createdAt: 0 },
-        { id: 'tpl-reading', name: '读书笔记', paper: { style: 'cornell', color: 'cream' }, bg: null, createdAt: 0 },
-        { id: 'tpl-study', name: '学习计划', paper: { style: 'planner', color: 'blue' }, bg: null, createdAt: 0 },
-        { id: 'tpl-errors', name: '错题本', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0 }
+        { id: 'tpl-lecture', name: '听课笔记', paper: { style: 'cornell', color: 'white' }, bg: null, createdAt: 0, title: '听课笔记', sub: '课程：　　　　日期：　　　　', titleSize: 32, subSize: 15 },
+        { id: 'tpl-meeting', name: '会议记录', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0, title: '会议记录', sub: '主题 / 日期 / 参会人', titleSize: 32, subSize: 15 },
+        { id: 'tpl-todo', name: '待办清单', paper: { style: 'check', color: 'white' }, bg: null, createdAt: 0, title: '待办事项', sub: '日期：　　　　', titleSize: 30, subSize: 15 },
+        { id: 'tpl-daily', name: '日程计划', paper: { style: 'planner', color: 'white' }, bg: null, createdAt: 0, title: '日程计划', sub: '第　　周', titleSize: 30, subSize: 15 },
+        { id: 'tpl-reading', name: '读书笔记', paper: { style: 'cornell', color: 'cream' }, bg: null, createdAt: 0, title: '读书笔记', sub: '书名：　　　　作者：　　　　', titleSize: 30, subSize: 15 },
+        { id: 'tpl-study', name: '学习计划', paper: { style: 'planner', color: 'blue' }, bg: null, createdAt: 0, title: '学习计划', sub: '目标：　　　　', titleSize: 30, subSize: 15 },
+        { id: 'tpl-errors', name: '错题本', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0, title: '错题本', sub: '科目：　　　　', titleSize: 30, subSize: 15 }
       ],
       theme: 'auto', accent: 'blue', paperZoom: 1, ttsRate: 1, fontFamily: 'system',
       favorites: [], favoritesBar: true,
@@ -150,6 +150,25 @@ export function sanitize(raw) {
   // 迁移：旧 twoFingerUndo 开关 -> twoFingerAction
   if (!lib.settings.twoFingerAction) {
     lib.settings.twoFingerAction = lib.settings.twoFingerUndo === false ? 'off' : 'undo';
+  }
+  // 模板迁移：为旧内置模板补充标题元数据
+  if (Array.isArray(lib.settings.templates)) {
+    lib.settings.templates.forEach(t => {
+      if (t && t.id && String(t.id).startsWith('tpl-') && !t.title) {
+        t.title = t.name || '模板';
+        const subs = {
+          'tpl-lecture': '课程：　　　　日期：　　　　',
+          'tpl-meeting': '主题 / 日期 / 参会人',
+          'tpl-todo': '日期：　　　　',
+          'tpl-daily': '第　　周',
+          'tpl-reading': '书名：　　　　作者：　　　　',
+          'tpl-study': '目标：　　　　',
+          'tpl-errors': '科目：　　　　'
+        };
+        if (subs[t.id]) t.sub = subs[t.id];
+        t.titleSize = t.titleSize || 32; t.subSize = t.subSize || 15;
+      }
+    });
   }
   // v1/v2 -> v3：彻底移除放大镜，补充新设置字段
   if (fromVersion < 3) {

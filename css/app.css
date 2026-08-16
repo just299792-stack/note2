@@ -1144,6 +1144,7 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 
 /* 模板中心 */
 .tpl-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.tpl-empty { font-size: 12px; color: var(--text-3); padding: 8px 2px; }
 .tpl-preview { width: 46px; height: 60px; border-radius: 5px; border: 1px solid rgba(0,0,0,.12); display: flex; align-items: flex-end; padding: 4px; box-shadow: var(--shadow-sm); flex: none; overflow: hidden; }
 .tpl-name { font-size: 10px; font-weight: 700; color: rgba(15,23,42,.75); background: rgba(255,255,255,.6); padding: 1px 4px; border-radius: 4px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tpl-row .mini-btn { flex: none; }
