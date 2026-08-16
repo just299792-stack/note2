@@ -756,6 +756,38 @@ button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .r
 }
 
 /* ============ v4.26?????? / ?? / ?? / ?? / ???? / ?? / ?? ============ */
+.note-tabs {
+  display: flex; align-items: center; gap: 5px; padding: 6px 10px 0; overflow-x: auto;
+  flex: none; min-height: 34px; scrollbar-width: none;
+}
+.note-tabs.hidden { display: none; }
+.tab {
+  display: flex; align-items: center; gap: 5px; max-width: 190px; min-width: 72px;
+  padding: 5px 6px 6px 12px; border-radius: 10px 10px 0 0; cursor: pointer;
+  background: rgba(128,128,128,.07); border: 1px solid transparent; border-bottom: none;
+  color: var(--text-2); font-size: 12.5px; white-space: nowrap; transition: background .15s, color .15s;
+}
+.tab:hover { background: rgba(128,128,128,.13); }
+.tab.active { background: var(--bg-elev); border-color: var(--border); color: var(--text-1); }
+.tab .tab-title { overflow: hidden; text-overflow: ellipsis; }
+.tab .tab-close {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; padding: 0; border: none; border-radius: 6px;
+  background: none; color: var(--text-3); cursor: pointer;
+}
+.tab .tab-close:hover { background: rgba(220,38,38,.14); color: var(--danger); }
+.tab .tab-close .ic { width: 13px; height: 13px; }
+.tab-add {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 26px; height: 26px; padding: 0; border: none; border-radius: 8px;
+  background: none; color: var(--text-2); cursor: pointer;
+}
+.tab-add:hover { background: rgba(128,128,128,.14); color: var(--accent); }
+.tab-picker { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow: auto; }
+.tab-pick-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 9px; cursor: pointer; }
+.tab-pick-row:hover { background: rgba(128,128,128,.1); }
+.tab-pick-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.tab-pick-meta { font-size: 11px; color: var(--text-3); flex: none; }
 .favorites-bar {
   display: flex; align-items: center; gap: 6px; padding: 5px 10px;
   background: var(--bg-elev); border-bottom: 1px solid var(--border);

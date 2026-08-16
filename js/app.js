@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.40';
+const APP_VERSION = '5.41';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -422,10 +422,100 @@ async function flushSave() {
 }
 
 /* ---------------- 打开笔记 / 页面 ---------------- */
+function getOpenTabs() {
+  const st = state.lib.settings;
+  if (!Array.isArray(st.tabs)) st.tabs = [];
+  return st.tabs;
+}
+
+function renderTabs() {
+  const bar = $('#noteTabs');
+  if (!bar) return;
+  const tabs = getOpenTabs().filter(id => state.lib.notes[id]);
+  if (state.lib.settings.tabs.length !== tabs.length) state.lib.settings.tabs = tabs;
+  if (!tabs.length) { bar.classList.add('hidden'); bar.innerHTML = ''; return; }
+  bar.classList.remove('hidden');
+  bar.innerHTML = '';
+  for (const id of tabs) {
+    const note = state.lib.notes[id];
+    const tab = document.createElement('div');
+    tab.className = 'tab' + (id === state.activeNoteId ? ' active' : '');
+    tab.title = note.title || '未命名笔记';
+    const title = document.createElement('span');
+    title.className = 'tab-title';
+    title.textContent = note.title || '未命名笔记';
+    const close = document.createElement('button');
+    close.className = 'tab-close';
+    close.setAttribute('aria-label', '关闭');
+    close.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg>';
+    close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(id); });
+    tab.appendChild(title);
+    tab.appendChild(close);
+    tab.addEventListener('click', () => { if (state.activeNoteId !== id) openNote(id); });
+    bar.appendChild(tab);
+  }
+  const add = document.createElement('button');
+  add.className = 'tab-add';
+  add.title = '打开更多笔记';
+  add.setAttribute('aria-label', '打开更多笔记');
+  add.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M12 5.5v13M5.5 12h13"/></svg>';
+  add.addEventListener('click', openTabPicker);
+  bar.appendChild(add);
+}
+
+function closeTab(id) {
+  const tabs = getOpenTabs();
+  const idx = tabs.indexOf(id);
+  if (idx < 0) return;
+  tabs.splice(idx, 1);
+  if (state.activeNoteId === id) {
+    const remaining = tabs.filter(x => state.lib.notes[x]);
+    if (remaining.length) {
+      openNote(remaining[Math.max(0, idx - 1)] || remaining[remaining.length - 1]);
+    } else {
+      const any = Object.keys(state.lib.notes);
+      if (any.length) openNote(any[0]);
+      else {
+        state.activeNoteId = null;
+        renderLibrary();
+        engine.setPage(null);
+        engine.invalidateRaster();
+        updateEmptyState();
+      }
+    }
+  }
+  renderTabs();
+  saveSoon();
+}
+
+function openTabPicker() {
+  const notes = Object.values(state.lib.notes);
+  if (!notes.length) { toast('还没有笔记'); return; }
+  const { body } = modalShell('打开笔记', '<div class="tab-picker"></div>', [{ label: '取消' }]);
+  const list = body.querySelector('.tab-picker');
+  notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  for (const n of notes) {
+    const row = document.createElement('div');
+    row.className = 'tab-pick-row';
+    const name = document.createElement('span');
+    name.className = 'tab-pick-name';
+    name.textContent = n.title || '未命名笔记';
+    const meta = document.createElement('span');
+    meta.className = 'tab-pick-meta';
+    meta.textContent = n.pages.length + ' 页';
+    row.appendChild(name);
+    row.appendChild(meta);
+    row.addEventListener('click', () => { closeModal(); openNote(n.id); });
+    list.appendChild(row);
+  }
+}
+
 function openNote(noteId, notebookId, subjectId, pageIndex) {
   const note = state.lib.notes[noteId];
   if (!note) return;
   if (state.multi.on) exitMulti();
+  const openTabs = getOpenTabs();
+  if (!openTabs.includes(noteId)) openTabs.push(noteId);
   state.activeNoteId = noteId;
   state.activeNotebookId = notebookId || note.notebookId || firstNotebookId();
   state.activeSubjectId = subjectId || findNotebook(state.lib, state.activeNotebookId)?.subject.id || state.lib.subjects[0].id;
@@ -1498,6 +1588,7 @@ function renderLibrary() {
   }
   renderNoteList();
   updateEmptyState();
+  renderTabs();
 }
 
 function updateEmptyState() {
@@ -1807,6 +1898,9 @@ function deleteNote(noteId) {
   const nb = findNotebook(state.lib, state.activeNotebookId);
   if (nb) nb.notebook.noteIds = nb.notebook.noteIds.filter(id => id !== noteId);
   delete state.lib.notes[noteId];
+  const openTabs = getOpenTabs();
+  const ti = openTabs.indexOf(noteId);
+  if (ti >= 0) openTabs.splice(ti, 1);
   if (state.activeNoteId === noteId) {
     const remaining = nb ? nb.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
     if (remaining.length) {

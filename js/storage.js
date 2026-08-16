@@ -33,7 +33,7 @@ export function newLibrary() {
       theme: 'auto', accent: 'blue', paperZoom: 1, ttsRate: 1, fontFamily: 'system',
       favorites: [], favoritesBar: true,
       penStyle: 'normal', ballpenStyle: 'normal',
-      textPresets: [], autoBackup: true
+      textPresets: [], autoBackup: true, tabs: []
     },
     subjects: [
       { id: subjId, name: '我的项目', notebooks: [ { id: nbId, name: '我的笔记本', noteIds: [] } ] }
