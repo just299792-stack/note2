@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.96';
+const APP_VERSION = '5.97';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1078,7 +1078,7 @@ function bindUI() {
     else if (k === 'a') { e.preventDefault(); selectAllPage(); }
     else if (k === '=' || k === '+') { e.preventDefault(); const r = Math.min(2, Math.round(((state.lib.settings.ttsRate || 1) + 0.25) * 100) / 100); state.lib.settings.ttsRate = r; saveLibrary(state.lib); renderSettings(); toast('朗读速度 ' + r.toFixed(2) + 'x'); }
     else if (k === '-' || k === '_') { e.preventDefault(); const r = Math.max(0.5, Math.round(((state.lib.settings.ttsRate || 1) - 0.25) * 100) / 100); state.lib.settings.ttsRate = r; saveLibrary(state.lib); renderSettings(); toast('朗读速度 ' + r.toFixed(2) + 'x'); }
-    else if (k === 's') { e.preventDefault(); saveSoon(true); toast('已保存'); }
+    else if (k === 's') { e.preventDefault(); if ($('#presMode') && !$('#presMode').classList.contains('hidden')) { savePresMarks(); } else { saveSoon(true); toast('已保存'); } }
     else if (k === 'p' && e.shiftKey) { e.preventDefault(); exportPagePng(); }
     else if (k === 'p') { e.preventDefault(); exportPdf(); }
   });
