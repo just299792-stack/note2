@@ -246,6 +246,8 @@ button:disabled { opacity: .35; pointer-events: none; }
   width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(0,0,0,.12);
   display: flex; align-items: center; justify-content: center; transition: transform .1s;
 }
+.swatch.cust { border: 1.5px dashed rgba(0,0,0,.25); background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); position: relative; overflow: hidden; }
+.swatch.cust input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .swatch.active { box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent); transform: scale(1.06); }
 .swatch .check { color: #fff; width: 13px; height: 13px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
 .width-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }

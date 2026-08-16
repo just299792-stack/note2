@@ -88,14 +88,14 @@ async function handleAi(req, res) {
     if (up.statusCode !== 200) {
       let err = '';
       up.on('data', (c) => { err += c; if (err.length > 2000) up.destroy(); });
-      up.on('end', () => { if (!res.writableEnded) sendJson(res, 502, { error: 'AI 服务返回异常', detail: String(err).slice(0, 500) }); });
+      up.on('end', () => { if (!res.headersSent && !res.writableEnded) sendJson(res, 502, { error: 'AI 服务返回异常', detail: String(err).slice(0, 500) }); });
       return;
     }
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store' });
     up.pipe(res);
   });
   upReq.on('error', () => { if (!res.writableEnded) sendJson(res, 502, { error: 'AI 服务连接失败（请检查电脑网络）' }); });
-  upReq.on('timeout', () => { upReq.destroy(); if (!res.writableEnded) sendJson(res, 504, { error: 'AI 服务超时' }); });
+  upReq.on('timeout', () => { upReq.destroy(); if (!res.headersSent && !res.writableEnded) sendJson(res, 504, { error: 'AI 服务超时' }); });
   upReq.write(body);
   upReq.end();
 }

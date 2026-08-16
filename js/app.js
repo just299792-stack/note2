@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.55';
+const APP_VERSION = '5.56';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1121,6 +1121,23 @@ function updateColorUI() {
     });
     box.appendChild(sw);
   }
+  // 自定义颜色
+  const cust = document.createElement('label');
+  cust.className = 'swatch cust';
+  cust.title = '自定义颜色';
+  cust.innerHTML = '<input type="color" value="' + state.color + '">';
+  const ci = cust.querySelector('input');
+  ci.addEventListener('input', () => {
+    const c = ci.value;
+    state.colors[state.tool] = c;
+    state.color = c;
+    if (state.tool === 'highlighter') state.lib.settings.hlColor = c;
+    else if (state.tool === 'ballpen') state.lib.settings.ballpenColor = c;
+    else state.lib.settings.color = c;
+    saveLibrary(state.lib);
+    updateColorUI();
+  });
+  box.appendChild(cust);
   const w = state.widths[state.tool] || 5;
   $('#widthSlider').value = w;
   $('#widthValue').textContent = Math.round(w);
