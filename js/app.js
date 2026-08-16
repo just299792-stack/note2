@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.19';
+const APP_VERSION = '5.20';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -458,6 +458,7 @@ function pageFade() {
 function switchPage(i) {
   const note = currentNote();
   if (!note || i < 0 || i >= note.pages.length) return;
+  const dir = i > state.pageIndex ? 'right' : 'left';
   state.pageIndex = i;
   engine.setPage(currentPage());
   pageFade();
@@ -468,6 +469,13 @@ function switchPage(i) {
   updatePageNav();
   state.lib.active.pageIndex = i;
   saveSoon();
+  const ph = document.querySelector('.paper-holder');
+  if (ph) {
+    ph.classList.remove('turning-right', 'turning-left');
+    void ph.offsetWidth;
+    ph.classList.add('turning-' + dir);
+    setTimeout(() => ph.classList.remove('turning-right', 'turning-left'), 340);
+  }
 }
 
 function applyPagesChange() {
@@ -2816,11 +2824,11 @@ function outlineNote() {
   note.pages.forEach((p, i) => {
     (p.texts || []).forEach(t => {
       const len = (t.text || '').trim();
-      if (len && (t.fontSize || 0) >= 26) items.push({ page: i, text: len.slice(0, 40), size: t.fontSize });
+      if (len && (t.fontSize || 0) >= 26) items.push({ page: i, text: len.slice(0, 40), size: t.fontSize, lvl: (t.fontSize || 0) >= 34 ? 1 : 2 });
     });
   });
   if (!items.length) { toast('没有检测到标题（字号较大的文字）'); return; }
-  const body = items.map(it => `<div class="outline-row" data-p="${it.page}"><span class="ol-dot"></span><span class="ol-text">${escapeHtml(it.text)}</span><span class="ol-page">第 ${it.page + 1} 页</span></div>`).join('');
+  const body = items.map(it => `<div class="outline-row lvl${it.lvl}" data-p="${it.page}"><span class="ol-dot"></span><span class="ol-text">${escapeHtml(it.text)}</span><span class="ol-page">第 ${it.page + 1} 页</span></div>`).join('');
   modalShell('大纲', body, [{ label: '关闭' }]);
   const mask = document.querySelector('#modalRoot .modal-mask');
   if (mask) mask.querySelectorAll('.outline-row').forEach(r => r.addEventListener('click', () => {

@@ -1138,3 +1138,8 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 .welcome-body p:first-child { margin-top: 4px; }
 
 .ai-summary { font-size: 14px; line-height: 1.7; color: var(--text); max-height: 60vh; overflow-y: auto; }
+
+.rec-btn.recording { animation: recPulse 1.1s ease-in-out infinite; }
+@keyframes recPulse { 0%,100% { box-shadow: 0 8px 22px rgba(220,38,38,.45); } 50% { box-shadow: 0 8px 30px rgba(220,38,38,.85), 0 0 0 7px rgba(220,38,38,.16); } }
+.outline-row.lvl2 .ol-text { padding-left: 18px; }
+.outline-row.lvl1 .ol-text { font-weight: 700; }
