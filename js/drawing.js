@@ -179,7 +179,7 @@ export function drawTextItem(ctx, t, font, w, h) {
   ctx.textBaseline = 'top';
   const lines = wrapText(ctx, t.text, t.w * w);
   let y = t.y * h;
-  const lh = t.fontSize * 1.25;
+  const lh = t.fontSize * (t.lh || 1.3);
   for (const ln of lines) {
     let x = t.x * w;
     if (t.align === 'center') x += (t.w * w - ctx.measureText(ln).width) / 2;

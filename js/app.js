@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.57';
+const APP_VERSION = '5.58';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -707,6 +707,7 @@ function attachTextStyleBar(ta, item) {
       ta.style.fontStyle = item.italic ? 'italic' : 'normal';
       ta.style.textDecoration = item.underline ? 'underline' : 'none';
       ta.style.color = item.color;
+      ta.style.lineHeight = String(item.lh || 1.3);
     };
     sync();
     const mk = (label, cls, fn) => {
@@ -737,6 +738,7 @@ function attachTextStyleBar(ta, item) {
       if (hc) b.style.background = hc; else b.title = '清除高亮';
     });
     [['left', '左'], ['center', '中'], ['right', '右']].forEach(([v, l]) => mk(l, 'ts-align ' + (item.align === v ? 'active' : ''), () => { item.align = v; render(); }));
+    [['1.1', '紧凑'], ['1.3', '标准'], ['1.6', '宽松']].forEach(([v, l]) => mk(l, 'ts-lh ' + ((item.lh || 1.3) === parseFloat(v) ? 'active' : ''), () => { item.lh = parseFloat(v); ta.style.lineHeight = String(item.lh); render(); }));
   };
   render();
   layer.appendChild(bar);
@@ -747,7 +749,7 @@ function createTextEdit(world) {
   const fontSize = state.lib.settings.textSize || 26;
   const color = state.color;
   const pres = (state.lib.settings.textPresets && state.lib.settings.textPresets[1]) || {};
-  const item = { id: newId(), x: world.x / pageW(), y: world.y / pageH(), w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline, hl: null };
+  const item = { id: newId(), x: world.x / pageW(), y: world.y / pageH(), w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline, hl: null, lh: 1.3 };
   const layer = $('#textLayer');
   const ta = document.createElement('textarea');
   ta.className = 'text-edit';
@@ -759,7 +761,7 @@ function createTextEdit(world) {
   ta.style.minHeight = Math.round(fontSize * 1.4 * scale) + 'px';
   ta.style.fontSize = Math.round(fontSize * scale) + 'px';
   ta.style.color = color;
-  ta.style.lineHeight = '1.3';
+  ta.style.lineHeight = String(item.lh || 1.3);
   ta.placeholder = '输入文字…';
   layer.appendChild(ta);
   const styleBar = attachTextStyleBar(ta, item);
@@ -779,7 +781,7 @@ function createTextEdit(world) {
     const pad = 10;
     item.text = text;
     item.w = Math.max(0.12, (maxW + pad * 2) / pageW());
-    item.h = (lines.length * fontSize * 1.3 + pad * 2) / pageH();
+    item.h = (lines.length * fontSize * (item.lh || 1.3) + pad * 2) / pageH();
     mutate(() => currentPage().texts.push(item), '文字');
   };
   ta.addEventListener('blur', finish);
@@ -803,6 +805,7 @@ function editTextItem(item) {
   ta.style.minHeight = Math.round(item.h * pageH() * scale) + 'px';
   ta.style.fontSize = Math.round(item.fontSize * scale) + 'px';
   ta.style.color = item.color;
+  ta.style.lineHeight = String(item.lh || 1.3);
   ta.value = item.text;
   layer.appendChild(ta);
   const styleBar = attachTextStyleBar(ta, item);
@@ -828,7 +831,7 @@ function editTextItem(item) {
     mutate(() => {
       item.text = text;
       item.w = Math.max(0.12, (maxW + pad * 2) / pageW());
-      item.h = (lines.length * item.fontSize * 1.3 + pad * 2) / pageH();
+      item.h = (lines.length * item.fontSize * (item.lh || 1.3) + pad * 2) / pageH();
     }, '编辑文字');
   };
   ta.addEventListener('blur', finish);
