@@ -8,9 +8,19 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.18';
+const APP_VERSION = '5.19';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+
+/* 全局文字字体（Notability 字体选择） */
+function currentFont() {
+  const f = (state.lib && state.lib.settings && state.lib.settings.fontFamily) || 'system';
+  if (f === 'rounded') return 'ui-rounded, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+  if (f === 'serif') return 'Georgia, "Songti SC", "STSong", "SimSun", serif';
+  if (f === 'mono') return '"SF Mono", Menlo, Consolas, monospace';
+  return FONT;
+}
+
 
 const PEN_COLORS = ['#1e293b','#0f172a','#475569','#94a3b8','#ffffff','#dc2626','#ea580c','#d97706','#16a34a','#0891b2','#2563eb','#7c3aed','#db2777'];
 const HL_COLORS = ['#fde047','#fef08a','#fdba74','#fca5a5','#86efac','#5eead4','#7dd3fc','#c4b5fd','#f9a8d4','#fda4af'];
@@ -63,7 +73,7 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   getPage: () => currentPage(),
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
   getSettings: settings,
-  getFont: () => FONT,
+  getFont: () => currentFont(),
   onStrokeDone: (st, holdMs) => {
     const hold = holdMs || 0;
     if (hold >= 250 && (st.tool === 'pen' || st.tool === 'ballpen') && tryRecognizeShape(st)) return;
@@ -904,6 +914,9 @@ function bindUI() {
     const k = e.key.toLowerCase();
     if (k === 'e' && !e.shiftKey) { e.preventDefault(); exportNote(); }
     else if (k === 'f') { e.preventDefault(); findInNote(); }
+    else if (k === 'n') { e.preventDefault(); createNote(); }
+    else if (k === 'd') { e.preventDefault(); duplicatePage(); }
+    else if (k === 'g') { e.preventDefault(); outlineNote(); }
     else if (k === 'p' && e.shiftKey) { e.preventDefault(); exportPagePng(); }
     else if (k === 'p') { e.preventDefault(); exportPdf(); }
   });
@@ -1183,6 +1196,18 @@ function renderSettings() {
       b.textContent = label;
       b.addEventListener('click', () => { st.ttsRate = v; saveLibrary(state.lib); renderSettings(); });
       ttsRow.appendChild(b);
+    });
+  }
+  // 文字字体
+  const fontRow = $('#fontFamilyRow');
+  if (fontRow) {
+    fontRow.innerHTML = '';
+    [['system', '系统'], ['rounded', '圆体'], ['serif', '衬线'], ['mono', '等宽']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = (st.fontFamily || 'system') === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { st.fontFamily = v; saveLibrary(state.lib); applySettingsFromLib(state.lib); engine.invalidateRaster(); renderPaperStack(); refreshThumbs(); renderSettings(); });
+      fontRow.appendChild(b);
     });
   }
   // 当前笔记行距
@@ -1570,7 +1595,7 @@ function renderNoteList() {
     coverEl.style.background = cov.bg;
     if (note.pages && note.pages[0]) {
       const cv = document.createElement('canvas');
-      renderPageToCanvas(cv, note.pages[0], note.paper, 90, FONT);
+      renderPageToCanvas(cv, note.pages[0], note.paper, 90, currentFont());
       coverEl.appendChild(cv);
     }
     if (note.pinned) {
@@ -1981,7 +2006,7 @@ function refreshThumbs() {
   const list = $('#pagesList');
   [...list.children].forEach((el, i) => {
     const cv = el.querySelector('canvas');
-    if (cv && note.pages[i]) renderPageToCanvas(cv, note.pages[i], note.paper, 160, FONT);
+    if (cv && note.pages[i]) renderPageToCanvas(cv, note.pages[i], note.paper, 160, currentFont());
     el.classList.toggle('active', i === state.pageIndex);
   });
 }
@@ -2018,7 +2043,7 @@ function renderPaperStack(keepScroll) {
     } else {
       if (Math.abs(i - state.pageIndex) <= 2) {
         const cv = document.createElement('canvas');
-        renderPageToCanvas(cv, page, note.paper, 640, FONT);
+        renderPageToCanvas(cv, page, note.paper, 640, currentFont());
         slot.appendChild(cv);
       } else {
         slot.classList.add('placeholder');
@@ -2051,7 +2076,7 @@ function renderPages() {
     const btn = document.createElement('button');
     btn.className = 'page-thumb' + (i === state.pageIndex ? ' active' : '');
     const cv = document.createElement('canvas');
-    renderPageToCanvas(cv, page, note.paper, 160, FONT);
+    renderPageToCanvas(cv, page, note.paper, 160, currentFont());
     btn.appendChild(cv);
     const num = document.createElement('span');
     num.className = 'pt-num';
@@ -2141,7 +2166,7 @@ async function exportPagePng() {
   const note = currentNote();
   if (!note || !currentPage()) return;
   const cv = document.createElement('canvas');
-  renderPageToCanvas(cv, currentPage(), note.paper, 1224, FONT);
+  renderPageToCanvas(cv, currentPage(), note.paper, 1224, currentFont());
   const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
   if (!blob) { toast('导出失败'); return; }
   await shareOrDownload(blob, safeName(note.title) + '-第' + (state.pageIndex + 1) + '页.png');
@@ -2158,7 +2183,7 @@ function withPdfHeader(cv, title, idx, total) {
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(0, h - 2); ctx.lineTo(out.width, h - 2); ctx.stroke();
   ctx.fillStyle = '#475569';
-  ctx.font = '600 30px ' + FONT;
+  ctx.font = '600 30px ' + currentFont();
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.fillText(String(title || '').slice(0, 60), 36, h / 2);
@@ -2177,7 +2202,7 @@ async function exportPdf() {
   const total = note.pages.length;
   const canvases = note.pages.map((page, i) => {
     const cv = document.createElement('canvas');
-    renderPageToCanvas(cv, page, note.paper, 1224, FONT);
+    renderPageToCanvas(cv, page, note.paper, 1224, currentFont());
     return withPdfHeader(cv, note.title, i, total);
   });
   const blob = canvasesToPdf(canvases, { title: note.title });
@@ -2505,7 +2530,7 @@ function renderPresPage() {
   if (h > wh) { h = wh; w = h * ratio; }
   cv.style.width = Math.round(w) + 'px';
   cv.style.height = Math.round(h) + 'px';
-  renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), FONT);
+  renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), currentFont());
   $('#presLabel').textContent = (state.pageIndex + 1) + ' / ' + note.pages.length;
 }
 function exitPresent() { $('#presMode').classList.add('hidden'); }
