@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.82';
+const APP_VERSION = '5.83';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3513,6 +3513,17 @@ function cropSelection() {
   img.src = im.src;
 }
 
+async function copySelectionText() {
+  const ids = engine.getSelectionIds();
+  const page = currentPage();
+  if (!page) return;
+  const texts = ids.filter(id => id.startsWith('t:')).map(id => (page.texts || []).find(t => t.id === id.slice(2))).filter(Boolean).map(t => t.text).filter(Boolean);
+  if (!texts.length) { toast('选中内容里没有文字'); return; }
+  const joined = texts.join('\n');
+  try { await navigator.clipboard.writeText(joined); toast('已复制 ' + texts.length + ' 个文字框'); }
+  catch (_) { toast('复制失败'); }
+}
+
 function replaceSelectionImage() {
   const ids = engine.getSelectionIds();
   const page = currentPage();
@@ -3626,6 +3637,7 @@ function bindV426UI() {
   const favAdd = $('#favAdd'); if (favAdd) favAdd.addEventListener('click', addFavorite);
   const favEdit = $('#favEdit'); if (favEdit) favEdit.addEventListener('click', toggleFavEdit);
   const sCopy = $('#selCopy'); if (sCopy) sCopy.addEventListener('click', () => copySelection());
+  const sCopyText = $('#selCopyText'); if (sCopyText) sCopyText.addEventListener('click', () => copySelectionText());
   const sRot = $('#selRotate'); if (sRot) sRot.addEventListener('click', () => rotateSelection());
   const sCrop = $('#selCrop'); if (sCrop) sCrop.addEventListener('click', () => cropSelection());
   const sExport = $('#selExport'); if (sExport) sExport.addEventListener('click', () => exportSelectionPng());
@@ -5198,7 +5210,7 @@ async function init() {
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
     renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
-    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, pinSelectedNotes, tagSelectedNotes,
+    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, copySelectionText, pinSelectedNotes, tagSelectedNotes,
     deletePageAt, clearBlankPages,
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
