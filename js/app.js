@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.64';
+const APP_VERSION = '5.65';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -903,6 +903,8 @@ function bindUI() {
     $('#settingsPanel').classList.remove('hidden');
   });
   // 录音
+  const btnReadQ = $('#btnReadQuick'); if (btnReadQ) btnReadQ.addEventListener('click', toggleReadAloud);
+  const btnMark = $('#btnMarkup'); if (btnMark) btnMark.addEventListener('click', () => toggleMarkupMode(!state.lib.settings.markup));
   $('#btnRec').addEventListener('click', (e) => {
     e.stopPropagation();
     const panel = $('#recPanel');
@@ -1200,6 +1202,7 @@ function setPageSize(size) {
 function toggleMarkupMode(on) {
   state.lib.settings.markup = !!on;
   document.body.classList.toggle('markup-mode', !!on);
+  const mb = $('#btnMarkup'); if (mb) mb.classList.toggle('active', !!on);
   renderPaperStack();
   engine.resize();
   saveLibrary(state.lib);
@@ -4558,6 +4561,7 @@ async function logout(showToastMsg) {
 function applySettingsFromLib(lib) {
   if (!lib) return;
   document.body.classList.toggle('markup-mode', lib.settings.markup === true);
+  const mb0 = document.getElementById('btnMarkup'); if (mb0) mb0.classList.toggle('active', lib.settings.markup === true);
   state.color = lib.settings.color || '#1e293b';
   state.colors.pen = lib.settings.color || '#1e293b';
   state.colors.highlighter = lib.settings.hlColor || '#fde047';
