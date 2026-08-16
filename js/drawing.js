@@ -132,6 +132,14 @@ export function drawTextItem(ctx, t, font, w, h) {
     let x = t.x * w;
     if (t.align === 'center') x += (t.w * w - ctx.measureText(ln).width) / 2;
     else if (t.align === 'right') x += t.w * w - ctx.measureText(ln).width;
+    if (t.hl) {
+      const hwd = ctx.measureText(ln).width;
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = t.hl;
+      ctx.fillRect(x - 2, y - 1, hwd + 4, t.fontSize * 1.18);
+      ctx.restore();
+    }
     ctx.fillText(ln, x, y);
     if (t.underline) {
       const wd = ctx.measureText(ln).width;

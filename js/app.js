@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.13';
+const APP_VERSION = '5.14';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -29,7 +29,7 @@ const state = {
   collapsedSubjects: new Set(),
   auth: null,
   authAvailable: false,
-  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [] },
+  rec: { active: false, recorder: null, media: null, chunks: [], startTime: 0, timer: null, noteId: null, pageId: null, baseCount: 0, timeline: [], playingId: null, audioEl: null, playback: false, playbackTimers: [], speed: 1 },
   recSupported: !!(navigator.mediaDevices && window.MediaRecorder),
   searchQuery: '',
   prevTool: null,
@@ -594,6 +594,10 @@ function attachTextStyleBar(ta, item) {
       const b = mk('', 'ts-color ' + (item.color === c ? 'active' : ''), () => { item.color = c; render(); });
       b.style.background = c;
     });
+    ['#fde047', '#fca5a5', '#86efac', '#7dd3fc', '#c4b5fd', ''].forEach(hc => {
+      const b = mk(hc ? '' : '×', 'ts-color hl ' + ((item.hl || '') === hc ? 'active' : ''), () => { item.hl = hc || null; render(); });
+      if (hc) b.style.background = hc; else b.title = '清除高亮';
+    });
     [['left', '左'], ['center', '中'], ['right', '右']].forEach(([v, l]) => mk(l, 'ts-align ' + (item.align === v ? 'active' : ''), () => { item.align = v; render(); }));
   };
   render();
@@ -605,7 +609,7 @@ function createTextEdit(world) {
   const fontSize = state.lib.settings.textSize || 26;
   const color = state.color;
   const pres = (state.lib.settings.textPresets && state.lib.settings.textPresets[1]) || {};
-  const item = { id: newId(), x: world.x / PAGE_W, y: world.y / PAGE_H, w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline };
+  const item = { id: newId(), x: world.x / PAGE_W, y: world.y / PAGE_H, w: 0.3, h: 0.06, text: '', fontSize, color, align: 'left', bold: !!pres.bold, italic: !!pres.italic, underline: !!pres.underline, hl: null };
   const layer = $('#textLayer');
   const ta = document.createElement('textarea');
   ta.className = 'text-edit';
@@ -2293,8 +2297,28 @@ async function importPdf(file) {
     const buf = await file.arrayBuffer();
     const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
     const maxPages = Math.min(doc.numPages, 60);
+    let rStart = 1, rEnd = maxPages;
+    if (maxPages > 1) {
+      rStart = await new Promise((resolve) => {
+        modalShell('导入页范围', '<input id="pdfRange" class="pdf-range" value="1-' + maxPages + '" placeholder="如 1-20 或全部">', [
+          { label: '取消', action: (mask) => { closeModal(); resolve(1); } },
+          { label: '导入', primary: true, action: (mask) => {
+            const v = (document.querySelector('#pdfRange') || {}).value || '';
+            const parts = v.split('-').map(x => parseInt(x, 10));
+            let a = 1, b = maxPages;
+            if (parts.length === 2 && parts[0] > 0 && parts[1] >= parts[0]) { a = parts[0]; b = Math.min(parts[1], maxPages); }
+            else if (parts.length === 1 && parts[0] > 0) { a = b = Math.min(parts[0], maxPages); }
+            closeModal();
+            resolve(a);
+            window.__pdfRangeEnd = b;
+          } }
+        ]);
+      });
+      rEnd = window.__pdfRangeEnd || maxPages;
+      delete window.__pdfRangeEnd;
+    }
     const pages = [];
-    for (let i = 1; i <= maxPages; i++) {
+    for (let i = rStart; i <= rEnd; i++) {
       const pdfPage = await doc.getPage(i);
       const base = pdfPage.getViewport({ scale: 1 });
       const targetW = Math.min(1400, Math.round(base.width * 1.5));
@@ -2515,6 +2539,13 @@ function pasteSelection() {
 function bindV426UI() {
   const favAdd = $('#favAdd'); if (favAdd) favAdd.addEventListener('click', addFavorite);
   const favEdit = $('#favEdit'); if (favEdit) favEdit.addEventListener('click', toggleFavEdit);
+  const spd = $('#recSpeed');
+  if (spd) spd.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-s]');
+    if (!b) return;
+    state.rec.speed = Number(b.dataset.s);
+    spd.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+  });
   const imgIn = $('#imageInput'); if (imgIn) imgIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertImage(f, 'gallery'); });
   const camIn = $('#cameraInput'); if (camIn) camIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertImage(f, 'camera'); });
   const pdfIn = $('#pdfInput'); if (pdfIn) pdfIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await importPdf(f); });
@@ -3253,6 +3284,7 @@ async function playRecording(item, startSec) {
   stopPlayback();
   const timeline = await getRecTimeline(note.id, item.id);
   const startMs = (startSec || 0) * 1000;
+  const speed = state.rec.speed || 1;
   // 跨页回放：快照所有涉及页，回放中自动切页跟随，结束后恢复原页（不污染数据）
   const pageIds = new Set(timeline.map(e => e.pageId).filter(Boolean));
   const preSnap = {};
@@ -3285,7 +3317,7 @@ async function playRecording(item, startSec) {
           c.strokes = c.strokes.filter(s => !ev.data.ids.includes(s.id));
         }
         engine.invalidateRaster();
-      }, ev.t - startMs));
+      }, (ev.t - startMs) / speed));
     }
     state.rec.playbackTimers.push(setTimeout(() => {
       if (state.rec.playback) {
@@ -3295,12 +3327,13 @@ async function playRecording(item, startSec) {
         }
         stopPlayback();
       }
-    }, maxT - startMs + 500));
+    }, (maxT - startMs + 500) / speed));
   }
   const url = URL.createObjectURL(blob);
   const audio = document.createElement('audio');
   audio.src = url;
   try { audio.currentTime = startSec || 0; } catch (_) {}
+  try { audio.playbackRate = speed; } catch (_) {}
   audio.play().catch(() => {});
   state.rec.audioEl = audio;
   state.rec.playingId = item.id;

@@ -1112,3 +1112,10 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 
 mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; padding: 0 1px; }
 .ni-snippet { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rec-speed { max-width: 260px; margin: 8px auto 2px; }
+.rec-speed button { padding: 5px 6px; font-size: 11px; }
+.ts-color.hl { width: 16px; height: 16px; min-width: 16px; border-radius: 4px; }
+.ts-color.hl.active { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pdf-range { width: 100%; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-elev2); color: var(--text); font: 14px var(--font); outline: none; }
+.pdf-range:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }

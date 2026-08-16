@@ -203,7 +203,7 @@ function sanitizePage(p) {
   p.texts = (p.texts || []).map(t => ({
     id: t.id || newId(), x: Number(t.x)||0, y: Number(t.y)||0, w: Number(t.w)||0.3, h: Number(t.h)||0.06,
     text: typeof t.text === 'string' ? t.text : '', fontSize: Number(t.fontSize)||24, color: t.color || '#1e293b', align: t.align || 'left',
-    bold: !!t.bold, italic: !!t.italic, underline: !!t.underline
+    bold: !!t.bold, italic: !!t.italic, underline: !!t.underline, hl: typeof t.hl === 'string' ? t.hl : null
   }));
   p.images = (p.images || []).filter(im => im && typeof im.src === 'string').map(im => ({
     id: im.id || newId(), x: Number(im.x)||0, y: Number(im.y)||0, w: Number(im.w)||0.3, h: Number(im.h)||0.2,
