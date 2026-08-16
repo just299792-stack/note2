@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.63';
+const APP_VERSION = '5.64';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4191,7 +4191,11 @@ async function summarizeNote() {
         } catch (_) {}
       }
     }
-    modalShell('AI 总结', '<div class="ai-summary">' + escapeHtml(answer || '（未生成）').replace(/\n/g, '<br>') + '</div>', [{ label: '关闭' }]);
+    modalShell('AI 总结', '<div class="ai-summary">' + escapeHtml(answer || '（未生成）').replace(/\n/g, '<br>') + '</div>', [
+    { label: '插入笔记', action: () => { closeModal(); insertAIText(answer || ''); } },
+    { label: '朗读', action: () => { closeModal(); speakAIText(answer || ''); } },
+    { label: '关闭' }
+  ]);
   } catch (e) {
     toast('总结失败：请确认服务器已启动并联网');
   }
