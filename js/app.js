@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.70';
+const APP_VERSION = '5.71';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -937,6 +937,8 @@ function bindUI() {
   const enEl = $('#btnEmptyNew');
   if (enEl) enEl.addEventListener('click', createNote);
   const mmEl = $('#multiMove'); if (mmEl) mmEl.addEventListener('click', moveSelectedNotes);
+  const mpEl = $('#multiPin'); if (mpEl) mpEl.addEventListener('click', pinSelectedNotes);
+  const mtEl = $('#multiTag'); if (mtEl) mtEl.addEventListener('click', tagSelectedNotes);
   const mdEl = $('#multiDelete'); if (mdEl) mdEl.addEventListener('click', deleteSelectedNotes);
   const mcEl = $('#multiCancel'); if (mcEl) mcEl.addEventListener('click', exitMulti);
   const btnTrash = $('#btnTrash'); if (btnTrash) btnTrash.addEventListener('click', openTrash);
@@ -2296,6 +2298,32 @@ function moveSelectedNotes() {
     });
     list.appendChild(b);
   }
+}
+function pinSelectedNotes() {
+  const ids = [...state.multi.selected];
+  if (!ids.length) { toast('请先选择笔记'); return; }
+  const notes = ids.map(id => state.lib.notes[id]).filter(Boolean);
+  if (!notes.length) return;
+  const allPinned = notes.every(n => n.pinned);
+  notes.forEach(n => { n.pinned = !allPinned; });
+  saveLibrary(state.lib);
+  renderNoteList();
+  toast(allPinned ? '已取消置顶 ' + notes.length + ' 篇' : '已置顶 ' + notes.length + ' 篇');
+}
+function tagSelectedNotes() {
+  const ids = [...state.multi.selected];
+  if (!ids.length) { toast('请先选择笔记'); return; }
+  const colors = TAG_COLORS;
+  const body = '<div class="nb-colors">' + colors.map(c => '<button class="nb-color" data-c="' + c + '" style="background:' + c + '"></button>').join('') + '<button class="nb-color off" data-c="">无</button></div>';
+  modalShell('批量设置标签颜色', body, [{ label: '取消' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('.nb-color').forEach(b => b.addEventListener('click', () => {
+    ids.forEach(id => { const n = state.lib.notes[id]; if (n) n.colorTag = b.dataset.c || null; });
+    saveLibrary(state.lib);
+    renderNoteList();
+    toast('已为 ' + ids.length + ' 篇笔记设置标签');
+  }));
 }
 function deleteSelectedNotes() {
   if (!state.multi.selected.size) { toast('请先选择笔记'); return; }
@@ -5065,7 +5093,7 @@ async function init() {
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
     renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
-    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection,
+    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, pinSelectedNotes, tagSelectedNotes,
     deletePageAt, clearBlankPages,
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
