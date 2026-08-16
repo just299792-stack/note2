@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.68';
+const APP_VERSION = '5.69';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -424,7 +424,7 @@ function saveSoon(touch) {
   refreshTitleMeta();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const done = () => { state.saving = false; refreshTitleMeta(); };
+    const done = () => { state.saving = false; state.lastSavedAt = Date.now(); refreshTitleMeta(); };
     if (state.auth) api('/api/library', { method: 'PUT', body: JSON.stringify(state.lib) }).then(done).catch(done);
     else Promise.resolve(saveLibrary(state.lib)).then(done);
     scheduleSnapshot();
@@ -1069,6 +1069,7 @@ function bindUI() {
     else if (k === 'n') { e.preventDefault(); createNote(); }
     else if (k === 'd') { e.preventDefault(); duplicatePage(); }
     else if (k === 'g') { e.preventDefault(); outlineNote(); }
+    else if (k === 's') { e.preventDefault(); saveSoon(true); toast('已保存'); }
     else if (k === 'p' && e.shiftKey) { e.preventDefault(); exportPagePng(); }
     else if (k === 'p') { e.preventDefault(); exportPdf(); }
   });
@@ -1165,7 +1166,15 @@ function refreshTitleMeta() {
   const d = new Date(n.updatedAt);
   const hh = String(d.getHours()).padStart(2, '0');
   const mm = String(d.getMinutes()).padStart(2, '0');
-  $('#titleMeta').textContent = `${pages} 页 · ${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}` + (state.saving ? ' · 保存中…' : '');
+  let meta = `${pages} 页 · ${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}` + (state.saving ? ' · 保存中…' : '');
+  if (!state.saving && state.lastSavedAt) {
+    const ls = new Date(state.lastSavedAt);
+    const lh = String(ls.getHours()).padStart(2, '0');
+    const lm = String(ls.getMinutes()).padStart(2, '0');
+    const ls2 = String(ls.getSeconds()).padStart(2, '0');
+    meta += ' · 已保存 ' + lh + ':' + lm + ':' + ls2;
+  }
+  $('#titleMeta').textContent = meta;
 }
 
 const PAGE_SIZES = { standard: { w: 816, h: 1056, name: '标准' }, wide: { w: 1056, h: 816, name: '宽版' } };

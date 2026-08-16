@@ -1,5 +1,5 @@
 ﻿/* 笔记 · Service Worker —— 离线可用 */
-const CACHE = 'note2-v82';
+const CACHE = 'note2-v83';
 const ASSETS = [
   './',
   './index.html',
