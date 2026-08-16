@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.71';
+const APP_VERSION = '5.72';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4086,6 +4086,7 @@ function saveCurrentAsTemplate(name) {
     name: name || ('我的模板 ' + ((st.templates || []).length + 1)),
     paper: JSON.parse(JSON.stringify(note.paper)),
     bg: currentPage() && currentPage().bg ? JSON.parse(JSON.stringify(currentPage().bg)) : null,
+    texts: currentPage() && currentPage().texts ? JSON.parse(JSON.stringify(currentPage().texts)) : null,
     createdAt: Date.now()
   };
   st.templates = st.templates || [];
@@ -4151,7 +4152,9 @@ function newNoteFromTemplate(tpl) {
   const note = newNote(state.activeNotebookId || firstNotebookId(), title, tpl.paper || { style: 'line', color: 'white' });
   applyDefaultPageSize(note);
   if (tpl.bg) note.pages[0].bg = JSON.parse(JSON.stringify(tpl.bg));
-  if (tpl.title) {
+  if (tpl.texts && tpl.texts.length) {
+    note.pages[0].texts = JSON.parse(JSON.stringify(tpl.texts));
+  } else if (tpl.title) {
     const ttexts = [];
     ttexts.push({ id: newId(), x: 0.12, y: 0.05, w: 0.76, h: 0.09, text: tpl.title, fontSize: tpl.titleSize || 32, color: '#1e293b', align: 'center', bold: true, italic: false, underline: false, hl: null });
     if (tpl.sub) ttexts.push({ id: newId(), x: 0.15, y: 0.165, w: 0.7, h: 0.05, text: tpl.sub, fontSize: tpl.subSize || 15, color: '#64748b', align: 'center', bold: false, italic: false, underline: false, hl: null });
