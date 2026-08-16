@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.76';
+const APP_VERSION = '5.77';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -967,6 +967,7 @@ function bindUI() {
     if (act === 'export-note') exportNote();
     if (act === 'export-pdf') exportPdf();
     if (act === 'export-page-png') exportPagePng();
+    if (act === 'export-page-pdf') exportPagePdf();
     if (act === 'export-longpng') exportNoteLongImage();
     if (act === 'export-library') exportLibrary();
     if (act === 'export-library-pdf') exportLibraryPdf();
@@ -2675,6 +2676,15 @@ async function exportPagePng() {
   if (!blob) { toast('导出失败'); return; }
   await shareOrDownload(blob, safeName(note.title) + '-p' + (state.pageIndex + 1) + '.png');
 }
+async function exportPagePdf() {
+  const note = currentNote();
+  if (!note || !currentPage()) return;
+  const cv = document.createElement('canvas');
+  renderPageToCanvas(cv, currentPage(), note.paper, 1224, currentFont(), note.pageW, note.pageH);
+  const blob = canvasesToPdf([withPdfHeader(cv, note.title, state.pageIndex, note.pages.length)], { title: note.title });
+  await shareOrDownload(blob, safeName(note.title) + '-p' + (state.pageIndex + 1) + '.pdf');
+}
+
 async function exportNoteLongImage() {
   const note = currentNote();
   if (!note) return;
@@ -5165,7 +5175,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportSelectionPng, replaceSelectionImage, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, exportLibraryPdf, openTrash, restoreNote, purgeTrash };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportSelectionPng, replaceSelectionImage, exportPagePdf, exportNoteRtf, exportNoteMarkdown, exportNoteLongImage, exportLibraryPdf, openTrash, restoreNote, purgeTrash };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
