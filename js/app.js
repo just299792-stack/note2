@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.62';
+const APP_VERSION = '5.63';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2688,12 +2688,35 @@ function withPdfHeader(cv, title, idx, total) {
 async function exportPdf() {
   const note = currentNote();
   if (!note) return;
+  const total = note.pages.length;
+  let rStart = 1, rEnd = total;
+  if (total > 1) {
+    rStart = await new Promise((resolve) => {
+      modalShell('导出页范围', '<input id="pdfExpRange" class="pdf-range" value="1-' + total + '" placeholder="如 1-10 或全部">', [
+        { label: '取消', action: (mask) => { closeModal(); resolve(-1); } },
+        { label: '导出', primary: true, action: (mask) => {
+          const v = (document.querySelector('#pdfExpRange') || {}).value || '';
+          const parts = v.split('-').map(x => parseInt(x, 10));
+          let a = 1, b = total;
+          if (parts.length === 2 && parts[0] > 0 && parts[1] >= parts[0]) { a = parts[0]; b = Math.min(parts[1], total); }
+          else if (parts.length === 1 && parts[0] > 0) { a = b = Math.min(parts[0], total); }
+          closeModal();
+          resolve(a);
+          window.__pdfExpEnd = b;
+        } }
+      ]);
+    });
+    if (rStart < 0) return;
+    rEnd = window.__pdfExpEnd || total;
+    delete window.__pdfExpEnd;
+  }
   toast('正在生成 PDF…');
   await new Promise(r => setTimeout(r, 30));
-  const total = note.pages.length;
-  const canvases = note.pages.map((page, i) => {
+  const indices = [];
+  for (let i = rStart - 1; i < rEnd; i++) indices.push(i);
+  const canvases = indices.map(i => {
     const cv = document.createElement('canvas');
-    renderPageToCanvas(cv, page, note.paper, 1224, currentFont(), note.pageW, note.pageH);
+    renderPageToCanvas(cv, note.pages[i], note.paper, 1224, currentFont(), note.pageW, note.pageH);
     return withPdfHeader(cv, note.title, i, total);
   });
   const blob = canvasesToPdf(canvases, { title: note.title });
