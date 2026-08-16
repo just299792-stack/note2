@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.30';
+const APP_VERSION = '5.31';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -735,6 +735,9 @@ function editTextItem(item) {
 function bindUI() {
   // 工具按钮
   document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.addEventListener('dblclick', () => {
+      if (btn.dataset.tool === 'eraser' || btn.dataset.tool === 'pixelEraser') clearPage();
+    });
     btn.addEventListener('click', () => {
       const newTool = btn.dataset.tool;
       if (newTool === 'eraser' || newTool === 'pixelEraser') state.prevTool = state.tool;
