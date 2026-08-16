@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.50';
+const APP_VERSION = '5.51';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -79,6 +79,17 @@ const engine = new DrawingEngine($('#viewCanvas'), {
   getPageSize: () => { const n = currentNote(); return { w: (n && n.pageW) || PAGE_W, h: (n && n.pageH) || PAGE_H }; },
   getSettings: settings,
   getFont: () => currentFont(),
+  snapshotPage: () => currentPage() ? pageSnapshot(currentPage()) : null,
+  onScaleDone: (before) => {
+    const page = currentPage();
+    if (!page) return;
+    const after = pageSnapshot(page);
+    if (before === after) return;
+    pushHistory('缩放内容', () => restoreContent(page, before), () => restoreContent(page, after));
+    engine.invalidateRaster();
+    refreshThumbs();
+    saveSoon(true);
+  },
   onStrokeDone: (st, holdMs) => {
     const hold = holdMs || 0;
     if (hold >= 250 && (st.tool === 'pen' || st.tool === 'ballpen') && tryRecognizeShape(st)) return;

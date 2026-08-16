@@ -564,10 +564,23 @@ export class DrawingEngine {
         if (settings.tool === 'eraser' && settings.eraserMode !== 'pixel') this.hitErase(w.x, w.y);
         break;
       case 'lasso':
-        if (this.selection && this.selection.ids.length && this.pointInBox(w, this.selection.box)) {
-          this.selection.moving = true;
-          this.selection.offset = { dx: 0, dy: 0 };
-          this.moveStart = { x: w.x, y: w.y };
+        if (this.selection && this.selection.ids.length) {
+          const hh = this.hitHandle(w);
+          if (hh) {
+            this.selection.scaling = hh;
+            this.selection.scaleStart = { x: w.x, y: w.y };
+            this.scaleBefore = (this.cb && this.cb.snapshotPage) ? this.cb.snapshotPage() : null;
+            this.dirtyView = true;
+            this.requestFrame();
+            break;
+          }
+          if (this.pointInBox(w, this.selection.box)) {
+            this.selection.moving = true;
+            this.selection.offset = { dx: 0, dy: 0 };
+            this.moveStart = { x: w.x, y: w.y };
+          } else {
+            this.lassoPath = [{ x: w.x, y: w.y }];
+          }
         } else {
           this.lassoPath = [{ x: w.x, y: w.y }];
         }
@@ -638,6 +651,9 @@ export class DrawingEngine {
       } else if (this.selection && this.selection.moving) {
         this.selection.offset = { dx: w.x - this.moveStart.x, dy: w.y - this.moveStart.y };
         this.dirtyView = true;
+      } else if (this.selection && this.selection.scaling) {
+        this.applyScale(w);
+        this.dirtyView = true;
       }
     } else if (settings.tool === 'text' && this.textTap) {
       if (Math.hypot(nx - this.textTap.x, ny - this.textTap.y) > 5) this.textTap.moved = true;
@@ -695,6 +711,7 @@ export class DrawingEngine {
         if (path.length >= 3) this.finishLasso(path);
         else this.dirtyView = true;
       } else if (this.selection && this.selection.moving) this.finishMove();
+      else if (this.selection && this.selection.scaling) this.finishScale();
     } else if (settings.tool === 'text' && this.textTap && !this.textTap.moved) {
       const t = this.textTap;
       this.textTap = null;
@@ -947,6 +964,58 @@ export class DrawingEngine {
     return Math.hypot(px - cx, py - cy);
   }
 
+  hitHandle(w) {
+    const sel = this.selection;
+    if (!sel || !sel.box) return null;
+    const b = sel.box;
+    const corners = { nw: [b.x, b.y], ne: [b.x + b.w, b.y], sw: [b.x, b.y + b.h], se: [b.x + b.w, b.y + b.h] };
+    for (const k of Object.keys(corners)) {
+      if (Math.hypot(w.x - corners[k][0], w.y - corners[k][1]) <= 16) return k;
+    }
+    return null;
+  }
+  applyScale(w) {
+    const sel = this.selection;
+    const page = this.page;
+    if (!sel || !sel.box || !page) return;
+    const old = sel.box;
+    const corner = sel.scaling;
+    const ax = (corner === 'se' || corner === 'ne') ? old.x : old.x + old.w;
+    const ay = (corner === 'se' || corner === 'sw') ? old.y : old.y + old.h;
+    let bx = Math.min(ax, w.x), by = Math.min(ay, w.y);
+    let bw = Math.max(16, Math.abs(w.x - ax)), bh = Math.max(16, Math.abs(w.y - ay));
+    const sx = bw / old.w, sy = bh / old.h;
+    const pW = this.pageW, pH = this.pageH;
+    for (const id of sel.ids) {
+      if (id.startsWith('i:')) {
+        const im = page.images.find(x => x.id === id.slice(2));
+        if (!im) continue;
+        im.x = ((im.x * pW - ax) * sx + ax) / pW;
+        im.y = ((im.y * pH - ay) * sy + ay) / pH;
+        im.w *= sx; im.h *= sy;
+      } else if (id.startsWith('t:')) {
+        const t = page.texts.find(x => x.id === id.slice(2));
+        if (!t) continue;
+        t.x = ((t.x * pW - ax) * sx + ax) / pW;
+        t.y = ((t.y * pH - ay) * sy + ay) / pH;
+        t.w *= sx; t.h *= sy;
+      } else {
+        const st = page.strokes.find(x => x.id === id);
+        if (!st) continue;
+        for (const pt of st.points) { pt.x = (pt.x - ax) * sx + ax; pt.y = (pt.y - ay) * sy + ay; }
+      }
+    }
+    sel.box = { x: bx, y: by, w: bw, h: bh };
+  }
+  finishScale() {
+    const sel = this.selection;
+    if (sel) { delete sel.scaling; delete sel.scaleStart; }
+    const before = this.scaleBefore;
+    this.scaleBefore = null;
+    if (this.cb && this.cb.onScaleDone) this.cb.onScaleDone(before);
+    this.dirtyView = true;
+    this.requestFrame();
+  }
   finishMove() {
     const sel = this.selection;
     if (!sel || !sel.moving || !sel.offset) { if (sel) sel.moving = false; return; }
