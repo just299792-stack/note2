@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.22';
+const APP_VERSION = '5.23';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -44,6 +44,7 @@ const state = {
   searchQuery: '',
   prevTool: null,
   noteSort: 'updated',
+  tagFilter: null,
   saving: false,
   multi: { on: false, selected: new Set() }
 };
@@ -1543,11 +1544,29 @@ function renderGlobalSearch(q) {
     root.appendChild(item);
   });
 }
+function renderTagFilter() {
+  const el = $('#tagFilter');
+  if (!el) return;
+  el.innerHTML = '';
+  const mk = (color, label, all) => {
+    const b = document.createElement('button');
+    b.className = 'tf-dot' + (all ? ' all' : '') + (state.tagFilter === color ? ' active' : '');
+    if (color) b.style.background = color;
+    b.title = label;
+    b.addEventListener('click', () => { state.tagFilter = state.tagFilter === color ? null : color; renderNoteList(); });
+    el.appendChild(b);
+  };
+  mk(null, '全部', true);
+  TAG_COLORS.forEach(c => mk(c, c, false));
+}
+
 function renderNoteList() {
   const root = $('#noteList');
   root.innerHTML = '';
   const f = findNotebook(state.lib, state.activeNotebookId);
   let notes = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
+  renderTagFilter();
+  if (state.tagFilter) notes = notes.filter(n => n.colorTag === state.tagFilter);
   const q = (state.searchQuery || '').trim().toLowerCase();
   if (q) { renderGlobalSearch(q); return; }
   if (q) {
@@ -2541,15 +2560,46 @@ function presentMode() {
 function renderPresPage() {
   const note = currentNote();
   if (!note) return;
+  const stage = $('#presStage');
   const cv = $('#presCanvas');
   const ww = window.innerWidth * 0.94, wh = window.innerHeight * 0.9;
   const ratio = PAGE_W / PAGE_H;
   let w = ww, h = w / ratio;
   if (h > wh) { h = wh; w = h * ratio; }
-  cv.style.width = Math.round(w) + 'px';
-  cv.style.height = Math.round(h) + 'px';
+  w = Math.round(w); h = Math.round(h);
+  stage.style.width = w + 'px';
+  stage.style.height = h + 'px';
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
   renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), currentFont());
+  const lz = $('#presLaser');
+  if (lz) { lz.width = w; lz.height = h; const lc = lz.getContext('2d'); lc.clearRect(0, 0, w, h); }
   $('#presLabel').textContent = (state.pageIndex + 1) + ' / ' + note.pages.length;
+}
+function drawLaser(e) {
+  const cv = $('#presCanvas');
+  const lz = $('#presLaser');
+  if (!cv || !lz) return;
+  const r = cv.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const dpr = window.devicePixelRatio || 1;
+  if (lz.width !== Math.round(r.width * dpr) || lz.height !== Math.round(r.height * dpr)) { lz.width = Math.round(r.width * dpr); lz.height = Math.round(r.height * dpr); }
+  const ctx = lz.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+  const g = ctx.createRadialGradient(x, y, 2, x, y, 26);
+  g.addColorStop(0, 'rgba(239,68,68,.95)');
+  g.addColorStop(0.5, 'rgba(239,68,68,.5)');
+  g.addColorStop(1, 'rgba(239,68,68,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, 26, 0, 7); ctx.fill();
+}
+function clearLaser() {
+  const lz = $('#presLaser');
+  if (!lz) return;
+  const ctx = lz.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, lz.width, lz.height);
 }
 function exitPresent() { $('#presMode').classList.add('hidden'); }
 
@@ -2659,6 +2709,8 @@ function bindV426UI() {
   const pClose = $('#presClose'); if (pClose) pClose.addEventListener('click', exitPresent);
   const pCv = $('#presCanvas');
   if (pCv) {
+    pCv.addEventListener('pointermove', drawLaser);
+    pCv.addEventListener('pointerleave', clearLaser);
     pCv.addEventListener('click', (e) => {
       const r = e.currentTarget.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width;

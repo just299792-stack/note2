@@ -1147,3 +1147,14 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 .ni-tag { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; margin-right: 5px; }
 .nb-color.off { background: var(--bg-elev2); border: 1px dashed var(--border-strong); color: var(--text-2); font-size: 11px; }
 .stats-body p { margin: 7px 0; font-size: 13.5px; color: var(--text); }
+
+.tag-filter { display: flex; gap: 6px; margin: 2px 10px 8px; align-items: center; flex-wrap: wrap; }
+.tf-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); transition: transform .12s, box-shadow .12s; flex: none; }
+.tf-dot.all { background: var(--bg-elev2); border: 1px dashed var(--border-strong); position: relative; }
+.tf-dot.all::after { content: ''; position: absolute; inset: 4px; border: 2px solid var(--text-3); border-radius: 50%; }
+.tf-dot.active { transform: scale(1.15); box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--text); }
+.tf-dot:hover { transform: scale(1.15); }
+.pres-stage { position: relative; }
+.pres-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#presLaser { pointer-events: none; border-radius: 6px; }
+.pres-mode canvas { max-width: none; max-height: none; }
