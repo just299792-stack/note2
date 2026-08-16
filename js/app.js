@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.47';
+const APP_VERSION = '5.48';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3876,6 +3876,21 @@ function appendAIMsg(role, text) {
   b.className = 'ai-bubble';
   b.textContent = text;
   row.appendChild(b);
+  if (role === 'assistant') {
+    const acts = document.createElement('div');
+    acts.className = 'ai-acts';
+    const ins = document.createElement('button');
+    ins.className = 'ai-act';
+    ins.textContent = '插入笔记';
+    ins.addEventListener('click', () => insertAIText(text));
+    const spk = document.createElement('button');
+    spk.className = 'ai-act';
+    spk.textContent = '朗读';
+    spk.addEventListener('click', () => speakAIText(text));
+    acts.appendChild(ins);
+    acts.appendChild(spk);
+    row.appendChild(acts);
+  }
   box.appendChild(row);
   box.scrollTop = box.scrollHeight;
   return b;
@@ -3964,6 +3979,39 @@ async function sendAIMessage() {
     aiBusy = false;
     updateAISend();
   }
+}
+
+function insertAIText(text) {
+  const page = currentPage();
+  if (!page) { toast('请先打开一个笔记'); return; }
+  const paras = String(text || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  if (!paras.length) { toast('回答为空'); return; }
+  const h = pageH();
+  const fontSize = state.lib.settings.textSize || 26;
+  const items = [];
+  let y = 0.08;
+  for (const para of paras) {
+    const lines = Math.max(1, Math.ceil(para.length / 28));
+    const ih = Math.max(0.05, (lines * fontSize * 1.3 + 12) / h);
+    items.push({ id: newId(), x: 0.06, y, w: 0.88, h: ih, text: para, fontSize, color: '#1e293b', align: 'left', bold: false, italic: false, underline: false, hl: null });
+    y += ih + 0.02;
+  }
+  mutate(() => { page.texts = page.texts || []; page.texts.push(...items); }, '插入 AI 回答');
+  engine.invalidateRaster();
+  refreshThumbs();
+  saveSoon(true);
+  toast('已插入 ' + items.length + ' 段文字');
+}
+
+function speakAIText(text) {
+  if (!('speechSynthesis' in window)) { toast('此设备不支持朗读'); return; }
+  if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); toast('已停止朗读'); return; }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(String(text || '').slice(0, 4000));
+  u.lang = 'zh-CN';
+  u.rate = state.lib.settings.ttsRate || 1;
+  window.speechSynthesis.speak(u);
+  toast('正在朗读回答…');
 }
 
 function bindAIUI() {
@@ -4588,7 +4636,7 @@ async function init() {
     toggleReadAloud, exportNoteText, notebookColor,
     renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
     insertAttachment, manageAttachments, showWelcomeGuide,
-    summarizeNote,
+    summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
     noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, exportNoteRtf };
   window.__addPage = addPage;

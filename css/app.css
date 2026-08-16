@@ -992,7 +992,10 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 .ai-model { font-size: 11px; color: var(--text-3); background: var(--bg-elev2); border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
 .ai-head .icon-btn { margin-left: auto; }
 .ai-msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.ai-msg { display: flex; }
+.ai-acts { display: flex; gap: 6px; margin-top: 6px; }
+.ai-act { font-size: 11px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-2); cursor: pointer; }
+.ai-act:hover { color: var(--accent); border-color: var(--accent); }
+.ai-msg { display: flex; flex-direction: column; }
 .ai-msg.user { justify-content: flex-end; }
 .ai-bubble {
   max-width: 86%; padding: 10px 13px; border-radius: 16px; font-size: 14px; line-height: 1.55;
