@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.41';
+const APP_VERSION = '5.42';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -949,6 +949,7 @@ function bindUI() {
     if (act === 'import-pdf') $('#pdfInput').click();
     if (act === 'insert-image') $('#imageInput').click();
     if (act === 'insert-camera') $('#cameraInput').click();
+    if (act === 'scan-docs') openScanner();
     if (act === 'present') presentMode();
     if (act === 'save-template') promptModal('保存当前页为模板', '', '模板名称', '保存', (nm) => { if (nm) saveCurrentAsTemplate(nm); });
     if (act === 'templates') openTemplateManager();
@@ -2663,6 +2664,122 @@ async function insertImage(file, source) {
   } catch (_) { toast('图片读取失败'); }
 }
 
+/* ---- 扫描文档（Notability 风格：拍照/相册 -> 多页笔记） ---- */
+let scanItems = [];
+let scanCtx = null;
+
+function downscaleDataURL(src, maxDim) {
+  return new Promise((resolve) => {
+    const dim = maxDim || 1400;
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if (Math.max(w, h) > dim) {
+        const k = dim / Math.max(w, h);
+        w = Math.round(w * k); h = Math.round(h * k);
+      }
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      try { resolve(cv.toDataURL('image/jpeg', 0.82)); } catch (_) { resolve(src); }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
+}
+
+function openScanner() {
+  scanItems = [];
+  const { body, btnRow } = modalShell('扫描文档',
+    '<div class="scan-tip">拍照或从相册选择，可多张连拍；完成后生成一篇多页笔记。</div>' +
+    '<div class="scan-actions"><button class="m-btn primary" id="scanCamera">拍照</button><button class="m-btn ghost" id="scanGallery">从相册选择…</button></div>' +
+    '<div class="scan-list"></div>' +
+    '<input type="file" id="scanCamInput" accept="image/*" capture="environment" hidden>' +
+    '<input type="file" id="scanGalInput" accept="image/*" multiple hidden>',
+    [{ label: '取消' }, { label: '完成', primary: true, action: finishScan }]);
+  const list = body.querySelector('.scan-list');
+  const finishBtn = btnRow.querySelector('.m-btn.primary');
+  scanCtx = { list, finishBtn };
+  body.querySelector('#scanCamera').addEventListener('click', () => body.querySelector('#scanCamInput').click());
+  body.querySelector('#scanGallery').addEventListener('click', () => body.querySelector('#scanGalInput').click());
+  const onFiles = async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    for (const f of files) await addScanFile(f);
+  };
+  body.querySelector('#scanCamInput').addEventListener('change', onFiles);
+  body.querySelector('#scanGalInput').addEventListener('change', onFiles);
+  renderScanList();
+}
+
+async function addScanFile(file) {
+  if (!file || !(file.type || '').startsWith('image/')) { toast('请选择图片'); return; }
+  const src = await readFileAsDataURL(file);
+  const small = await downscaleDataURL(src);
+  scanItems.push({ src: small, name: file.name || ('扫描 ' + (scanItems.length + 1)) });
+  renderScanList();
+}
+
+function renderScanList() {
+  const ctx = scanCtx;
+  if (!ctx) return;
+  ctx.list.innerHTML = '';
+  if (!scanItems.length) {
+    ctx.list.innerHTML = '<div class="scan-empty">还没有页面，先拍照或选图</div>';
+  }
+  scanItems.forEach((it, idx) => {
+    const row = document.createElement('div');
+    row.className = 'scan-item';
+    const thumb = document.createElement('img');
+    thumb.src = it.src;
+    const meta = document.createElement('span');
+    meta.className = 'scan-meta';
+    meta.textContent = '第 ' + (idx + 1) + ' 页';
+    const del = document.createElement('button');
+    del.className = 'scan-del';
+    del.setAttribute('aria-label', '删除');
+    del.textContent = '✕';
+    del.addEventListener('click', () => { scanItems.splice(idx, 1); renderScanList(); });
+    row.appendChild(thumb); row.appendChild(meta); row.appendChild(del);
+    ctx.list.appendChild(row);
+  });
+  ctx.finishBtn.textContent = '完成 (' + scanItems.length + ' 页)';
+}
+
+async function finishScan() {
+  if (!scanItems.length) { toast('还没有扫描页面'); return; }
+  let notebookId = currentNote() ? currentNote().notebookId : firstNotebookId();
+  let nb = notebookId ? findNotebook(state.lib, notebookId) : null;
+  if (!nb) {
+    let subj = null;
+    try { subj = findActiveSubject(); } catch (_) {}
+    subj = subj || state.lib.subjects[0];
+    if (!subj) { toast('请先创建项目/笔记本'); return; }
+    const nbObj = { id: newId(), name: '我的笔记本', noteIds: [] };
+    subj.notebooks.push(nbObj);
+    notebookId = nbObj.id;
+    nb = { subject: subj, notebook: nbObj };
+  }
+  const d = new Date();
+  const pad = (x) => String(x).padStart(2, '0');
+  const title = '扫描 · ' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const note = newNote(notebookId, title, { style: 'blank', color: 'white' });
+  note.pages = scanItems.map(it => {
+    const p = newPage();
+    p.images = [];
+    p.bg = { src: it.src, alpha: 1 };
+    return p;
+  });
+  state.lib.notes[note.id] = note;
+  nb.notebook.noteIds.push(note.id);
+  await saveLibrary(state.lib);
+  closeModal();
+  scanItems = [];
+  scanCtx = null;
+  openNote(note.id);
+  toast('已生成 ' + note.pages.length + ' 页扫描笔记');
+}
+
 /* ---- PDF 导入标注 ---- */
 async function importPdf(file) {
   if (!file) return;
@@ -4307,7 +4424,7 @@ async function init() {
   // 调试句柄（供测试/排查使用）
   window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList },
-    renderFavorites, insertImage, importPdf, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
+    renderFavorites, insertImage, openScanner, addScanFile, importPdf, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
     addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection,
     deletePageAt, clearBlankPages,
