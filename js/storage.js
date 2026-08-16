@@ -21,8 +21,8 @@ export function newLibrary() {
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
-      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26,
-      theme: 'auto',
+      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26, templates: [],
+      theme: 'auto', accent: 'blue',
       favorites: [], favoritesBar: true,
       penStyle: 'normal', ballpenStyle: 'normal',
       textPresets: [], autoBackup: true
@@ -128,8 +128,8 @@ export function sanitize(raw) {
     penWidth: 5, hlWidth: 14, hlColor: '#fde047',
     toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
     defaultPaper: { style: 'line', color: 'white' },
-    autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26,
-    theme: 'auto',
+    autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26, templates: [],
+    theme: 'auto', accent: 'blue',
     favorites: [], favoritesBar: true,
     penStyle: 'normal', ballpenStyle: 'normal',
     textPresets: [], autoBackup: true

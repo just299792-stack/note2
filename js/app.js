@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.10';
+const APP_VERSION = '5.11';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -16,6 +16,7 @@ const PEN_COLORS = ['#1e293b','#0f172a','#475569','#94a3b8','#ffffff','#dc2626',
 const HL_COLORS = ['#fde047','#fef08a','#fdba74','#fca5a5','#86efac','#5eead4','#7dd3fc','#c4b5fd','#f9a8d4','#fda4af'];
 const PAPER_STYLES = [ { id: 'blank', name: '空白' }, { id: 'line', name: '横线' }, { id: 'grid', name: '方格' }, { id: 'dot', name: '点阵' }, { id: 'cornell', name: '康奈尔' } ];
 const PAPER_COLORS = ['white', 'cream', 'grey', 'black', 'blue', 'green'];
+const ACCENTS = { blue: '#2563eb', purple: '#7c3aed', pink: '#db2777', green: '#16a34a', orange: '#ea580c', slate: '#475569' };
 
 const state = {
   lib: null,
@@ -368,6 +369,7 @@ function updateHistoryUI() {
 
 /* ---------------- 保存 ---------------- */
 function saveSoon(touch) {
+  if (state.rec && state.rec.playback) return;
   const note = currentNote();
   if (note && touch) note.updatedAt = Date.now();
   state.saving = true;
@@ -789,6 +791,9 @@ function bindUI() {
     if (act === 'insert-image') $('#imageInput').click();
     if (act === 'insert-camera') $('#cameraInput').click();
     if (act === 'present') presentMode();
+    if (act === 'save-template') promptModal('保存当前页为模板', '', '模板名称', '保存', (nm) => { if (nm) saveCurrentAsTemplate(nm); });
+    if (act === 'templates') openTemplateManager();
+    if (act === 'new-from-template') openTemplateManager();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
     if (act === 'add-page') addPage();
@@ -975,7 +980,21 @@ function updatePaperUI() {
 }
 
 /* ---------------- 设置面板与工具栏布局 ---------------- */
+function applyAccent() {
+  const name = (state.lib.settings.accent || 'blue');
+  const color = ACCENTS[name] || ACCENTS.blue;
+  const soft = hexToRgba(color, 0.12);
+  document.documentElement.style.setProperty('--accent', color);
+  document.documentElement.style.setProperty('--accent-soft', soft);
+}
+function hexToRgba(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+
 function applyTheme() {
+  applyAccent();
   const t = state.lib.settings.theme || 'auto';
   document.body.classList.toggle('theme-dark', t === 'dark');
   document.body.classList.toggle('theme-light', t === 'light');
@@ -1175,6 +1194,19 @@ function renderSettings() {
       b.textContent = label;
       b.addEventListener('click', () => { st.theme = v; saveLibrary(state.lib); applyTheme(); renderSettings(); });
       themeEl.appendChild(b);
+  // 主题色
+  const acRow = $('#accentRow');
+  if (acRow) {
+    acRow.innerHTML = '';
+    Object.keys(ACCENTS).forEach(k => {
+      const b = document.createElement('button');
+      b.className = 'accent-dot' + ((st.accent || 'blue') === k ? ' active' : '');
+      b.style.background = ACCENTS[k];
+      b.title = k;
+      b.addEventListener('click', () => { st.accent = k; saveLibrary(state.lib); applyAccent(); renderSettings(); });
+      acRow.appendChild(b);
+    });
+  }
     });
   }
   // ????
@@ -1336,12 +1368,60 @@ function renderNoteSortUI() {
   });
 }
 
+function renderGlobalSearch(q) {
+  const root = $('#noteList');
+  root.innerHTML = '';
+  const results = [];
+  for (const s of state.lib.subjects) {
+    for (const nb of s.notebooks) {
+      for (const id of nb.noteIds) {
+        const n = state.lib.notes[id];
+        if (!n) continue;
+        const titleHit = n.title.toLowerCase().includes(q);
+        let pageHit = -1, snippet = '';
+        (n.pages || []).forEach((p, i) => {
+          if (pageHit >= 0) return;
+          for (const t of p.texts || []) {
+            const tx = (t.text || '').toLowerCase();
+            if (tx.includes(q)) {
+              pageHit = i;
+              const idx = tx.indexOf(q);
+              snippet = t.text.slice(Math.max(0, idx - 12), idx + q.length + 18);
+              return;
+            }
+          }
+        });
+        if (titleHit || pageHit >= 0) results.push({ note: n, subject: s, notebook: nb, page: Math.max(0, pageHit), snippet });
+      }
+    }
+  }
+  if (!results.length) {
+    const empty = document.createElement('div');
+    empty.className = 'note-item';
+    empty.style.opacity = '.55';
+    empty.textContent = '没有找到与「' + q + '」相关的笔记';
+    root.appendChild(empty);
+    return;
+  }
+  const head = document.createElement('div');
+  head.className = 'note-group-head';
+  head.textContent = '全局搜索结果 · ' + results.length;
+  root.appendChild(head);
+  results.forEach(r => {
+    const item = document.createElement('div');
+    item.className = 'note-item';
+    item.innerHTML = `<div class="ni-title">${escapeHtml(r.note.title)}</div><div class="ni-meta">${escapeHtml(r.subject.name)} / ${escapeHtml(r.notebook.name)}${r.page >= 0 ? ' · 第' + (r.page + 1) + '页' : ''}</div>${r.snippet ? `<div class="ni-snippet">…${escapeHtml(r.snippet)}…</div>` : ''}`;
+    item.addEventListener('click', () => openNote(r.note.id, r.notebook.id, r.subject.id, r.page >= 0 ? r.page : 0));
+    root.appendChild(item);
+  });
+}
 function renderNoteList() {
   const root = $('#noteList');
   root.innerHTML = '';
   const f = findNotebook(state.lib, state.activeNotebookId);
   let notes = f ? f.notebook.noteIds.map(id => state.lib.notes[id]).filter(Boolean) : [];
   const q = (state.searchQuery || '').trim().toLowerCase();
+  if (q) { renderGlobalSearch(q); return; }
   if (q) {
     notes = notes.filter(n =>
       n.title.toLowerCase().includes(q) ||
@@ -2471,6 +2551,91 @@ function bindV426UI() {
     ph.addEventListener('pointercancel', () => { oneFinger = null; }, true);
   }
 }
+/* ---------------- 模板中心（Notability Templates） ---------------- */
+function saveCurrentAsTemplate(name) {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  const st = state.lib.settings;
+  const tpl = {
+    id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: name || ('我的模板 ' + ((st.templates || []).length + 1)),
+    paper: JSON.parse(JSON.stringify(note.paper)),
+    bg: currentPage() && currentPage().bg ? JSON.parse(JSON.stringify(currentPage().bg)) : null,
+    createdAt: Date.now()
+  };
+  st.templates = st.templates || [];
+  st.templates.push(tpl);
+  saveLibrary(state.lib);
+  toast('已保存为模板：' + tpl.name);
+}
+
+function openTemplateManager() {
+  const st = state.lib.settings;
+  st.templates = st.templates || [];
+  if (!st.templates.length) {
+    confirmModal('还没有模板', '可以把当前页保存成模板（纸张+背景），之后新建笔记就能一键使用。', '知道了');
+    return;
+  }
+  const body = st.templates.map((t, i) => {
+    const info = paperInfo(t.paper.color);
+    return `<div class="tpl-row" data-i="${i}">
+      <span class="tpl-preview" style="background:${info.bg}"><span class="tpl-name">${escapeHtml(t.name)}</span></span>
+      <button class="mini-btn primary" data-use="${t.id}">用此模板新建</button>
+      <button class="mini-btn" data-ren="${t.id}">重命名</button>
+      <button class="mini-btn danger" data-del="${t.id}">删除</button>
+    </div>`;
+  }).join('');
+  modalShell('模板中心', body, [{ label: '关闭' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('[data-use]').forEach(b => b.addEventListener('click', () => {
+    const t = st.templates.find(x => x.id === b.dataset.use);
+    if (!t) return;
+    closeModal();
+    newNoteFromTemplate(t);
+  }));
+  mask.querySelectorAll('[data-ren]').forEach(b => b.addEventListener('click', () => {
+    const t = st.templates.find(x => x.id === b.dataset.ren);
+    if (!t) return;
+    promptModal('重命名模板', t.name, '模板名称', '保存', (name) => {
+      if (!name) return;
+      t.name = name;
+      saveLibrary(state.lib);
+      openTemplateManager();
+    });
+  }));
+  mask.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+    const t = st.templates.find(x => x.id === b.dataset.del);
+    if (!t) return;
+    st.templates = st.templates.filter(x => x.id !== t.id);
+    saveLibrary(state.lib);
+    openTemplateManager();
+  }));
+}
+
+function newNoteFromTemplate(tpl) {
+  const d = new Date();
+  const title = tpl.name + ' · ' + `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const note = newNote(state.activeNotebookId || firstNotebookId(), title, tpl.paper || { style: 'line', color: 'white' });
+  if (tpl.bg) note.pages[0].bg = JSON.parse(JSON.stringify(tpl.bg));
+  state.lib.notes[note.id] = note;
+  let nb = findNotebook(state.lib, note.notebookId);
+  if (!nb) {
+    const subj = findActiveSubject() || state.lib.subjects[0];
+    if (!subj) { toast('请先创建项目'); return; }
+    const nbObj = { id: newId(), name: '我的笔记本', noteIds: [] };
+    subj.notebooks.push(nbObj);
+    note.notebookId = nbObj.id;
+    nb = { subject: subj, notebook: nbObj };
+  }
+  nb.notebook.noteIds.push(note.id);
+  state.activeSubjectId = nb.subject.id;
+  state.activeNotebookId = nb.notebook.id;
+  saveLibrary(state.lib);
+  openNote(note.id);
+  renderLibrary();
+  toast('已用模板新建笔记');
+}
 /* ---------------- AI 助手（DeepSeek，经本地服务器代理） ---------------- */
 let aiHistory = [];
 let aiBusy = false;
@@ -2828,7 +2993,8 @@ function recCapture(type, data) {
   r.timeline.push({
     t: Date.now() - r.startTime,
     type,
-    data: type === 'stroke' ? JSON.parse(JSON.stringify(data)) : data
+    data: type === 'stroke' ? JSON.parse(JSON.stringify(data)) : data,
+    pageId: currentPage() ? currentPage().id : r.pageId
   });
 }
 
@@ -2972,25 +3138,33 @@ async function playRecording(item, startSec) {
   if (!blob) { toast('音频文件不存在'); return; }
   stopPlayback();
   const timeline = await getRecTimeline(note.id, item.id);
-  const page = currentPage();
   const startMs = (startSec || 0) * 1000;
-  if (timeline.length && page) {
-    const tlIds = new Set(timeline.filter(e => e.type === 'stroke').map(e => e.data && e.data.id).filter(Boolean));
-    const clone = {
-      id: page.id,
-      strokes: page.strokes.filter(s => !tlIds.has(s.id)).map(s => JSON.parse(JSON.stringify(s))),
-      texts: JSON.parse(JSON.stringify(page.texts))
-    };
+  // 跨页回放：快照所有涉及页，回放中自动切页跟随，结束后恢复原页（不污染数据）
+  const pageIds = new Set(timeline.map(e => e.pageId).filter(Boolean));
+  const preSnap = {};
+  if (timeline.length) {
+    for (const pid of pageIds) {
+      const p = note.pages.find(x => x.id === pid);
+      if (p) preSnap[pid] = JSON.stringify(p);
+    }
     state.rec.playback = true;
     engine.playbackLock = true;
-    engine.setPage(clone);
-    engine.invalidateRaster();
     const maxT = Math.max(0, ...timeline.map(e => e.t));
-    for (const ev of timeline) {
-      if (ev.t < startMs) continue;
+    const playEvents = timeline.filter(e => e.t >= startMs);
+    for (const ev of playEvents) {
       state.rec.playbackTimers.push(setTimeout(() => {
-        if (!state.rec.playback || !engine.page) return;
+        if (!state.rec.playback) return;
+        if (ev.pageId && (!engine.page || engine.page.id !== ev.pageId)) {
+          const idx = note.pages.findIndex(x => x.id === ev.pageId);
+          if (idx >= 0 && idx !== state.pageIndex) {
+            state.pageIndex = idx;
+            engine.setPage(currentPage());
+            engine.invalidateRaster();
+            updatePageNav();
+          }
+        }
         const c = engine.page;
+        if (!c) return;
         if (ev.type === 'stroke') {
           if (!c.strokes.some(s => s.id === ev.data.id)) c.strokes.push(JSON.parse(JSON.stringify(ev.data)));
         } else if (ev.type === 'erase') {
@@ -2999,7 +3173,15 @@ async function playRecording(item, startSec) {
         engine.invalidateRaster();
       }, ev.t - startMs));
     }
-    state.rec.playbackTimers.push(setTimeout(() => { if (state.rec.playback) stopPlayback(); }, maxT - startMs + 1500));
+    state.rec.playbackTimers.push(setTimeout(() => {
+      if (state.rec.playback) {
+        for (const pid of Object.keys(preSnap)) {
+          const p = note.pages.find(x => x.id === pid);
+          if (p) Object.assign(p, JSON.parse(preSnap[pid]));
+        }
+        stopPlayback();
+      }
+    }, maxT - startMs + 500));
   }
   const url = URL.createObjectURL(blob);
   const audio = document.createElement('audio');
@@ -3036,7 +3218,7 @@ function resetSettings() {
       penWidth: 5, hlWidth: 14, hlColor: '#fde047',
       toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
       defaultPaper: { style: 'line', color: 'white' },
-      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', theme: 'auto', textSize: 26,
+      autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', noteSort: 'updated', theme: 'auto', accent: 'blue', textSize: 26,
       favorites: [], favoritesBar: true, penStyle: 'normal', ballpenStyle: 'normal', textPresets: [], autoBackup: true
     };
     applySettingsFromLib(state.lib);
@@ -3142,7 +3324,9 @@ async function init() {
     renderFavorites, insertImage, importPdf, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
     addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection,
-    deletePageAt, clearBlankPages };
+    deletePageAt, clearBlankPages,
+    saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
+    applyAccent, saveRecTimeline, getRecTimeline };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
