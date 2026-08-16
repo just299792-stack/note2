@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.32';
+const APP_VERSION = '5.33';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2971,6 +2971,17 @@ function bindV426UI() {
   // 手指在纸张左右边缘水平滑动翻页
   const ph = $('#paperHolder');
   if (ph) {
+    ph.addEventListener('dragover', (e) => { e.preventDefault(); ph.classList.add('drop-target'); });
+    ph.addEventListener('dragleave', () => ph.classList.remove('drop-target'));
+    ph.addEventListener('drop', (e) => {
+      e.preventDefault();
+      ph.classList.remove('drop-target');
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      if (f.type.startsWith('image/')) insertImage(f, 'gallery');
+      else if (f.type === 'application/pdf' || (f.name || '').toLowerCase().endsWith('.pdf')) importPdf(f);
+      else insertAttachment(f);
+    });
     let swipe = null;
     ph.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'touch') return;

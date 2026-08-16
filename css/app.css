@@ -1175,3 +1175,5 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 
 #presMark { pointer-events: none; border-radius: 6px; }
 #presPen.active { background: rgba(250,204,21,.35); color: #000; }
+
+.paper-holder.drop-target { outline: 3px dashed var(--accent); outline-offset: -6px; }
