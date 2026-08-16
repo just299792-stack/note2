@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.89';
+const APP_VERSION = '5.90';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1074,6 +1074,7 @@ function bindUI() {
     else if (k === 'n') { e.preventDefault(); createNote(); }
     else if (k === 'd') { e.preventDefault(); duplicatePage(); }
     else if (k === 'g') { e.preventDefault(); outlineNote(); }
+    else if (k === 'a') { e.preventDefault(); selectAllPage(); }
     else if (k === 's') { e.preventDefault(); saveSoon(true); toast('已保存'); }
     else if (k === 'p' && e.shiftKey) { e.preventDefault(); exportPagePng(); }
     else if (k === 'p') { e.preventDefault(); exportPdf(); }
@@ -3575,6 +3576,20 @@ function exportSelectionPng() {
   }, 'image/png');
 }
 
+function selectAllPage() {
+  const page = currentPage();
+  if (!page) return;
+  const ids = [];
+  (page.strokes || []).forEach(s => ids.push(s.id));
+  (page.texts || []).forEach(t => ids.push('t:' + t.id));
+  (page.images || []).forEach(im => ids.push('i:' + im.id));
+  if (!ids.length) { toast('页面没有内容'); return; }
+  engine.selection = { ids, box: engine.computeBox(ids), moving: false, offset: null };
+  engine.invalidateRaster();
+  const sb = $('#selBar'); if (sb) sb.classList.remove('hidden');
+  toast('已选中 ' + ids.length + ' 个对象');
+}
+
 function rotateSelection() {
   const ids = engine.getSelectionIds();
   if (!ids.length) return;
@@ -5219,7 +5234,7 @@ async function init() {
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList, clearAllRecordings },
     renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
-    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, copySelectionText, pinSelectedNotes, tagSelectedNotes,
+    addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, copySelectionText, selectAllPage, pinSelectedNotes, tagSelectedNotes,
     deletePageAt, clearBlankPages,
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
