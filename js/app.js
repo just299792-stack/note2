@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.44';
+const APP_VERSION = '5.45';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3316,38 +3316,70 @@ function bindV426UI() {
 }
 /* ---------------- 朗读与导出文字（Notability 阅读/导出体验） ---------------- */
 let ttsActive = false;
+let ttsQueue = [];
+let ttsToken = 0;
+let ttsHlEl = null;
+
+function ttsClearHighlight() {
+  if (ttsHlEl && ttsHlEl.parentNode) ttsHlEl.parentNode.removeChild(ttsHlEl);
+  ttsHlEl = null;
+}
+
+function ttsShowHighlight(item) {
+  ttsClearHighlight();
+  const layer = $('#textLayer');
+  if (!layer || !item) return;
+  const sp = engine.worldToScreen(item.x * pageW(), item.y * pageH());
+  const scale = engine.scale;
+  const el = document.createElement('div');
+  el.className = 'tts-hl';
+  el.style.left = sp.x + 'px';
+  el.style.top = sp.y + 'px';
+  el.style.width = Math.max(20, item.w * pageW() * scale) + 'px';
+  el.style.height = Math.max(14, item.h * pageH() * scale) + 'px';
+  layer.appendChild(el);
+  ttsHlEl = el;
+}
+
+function ttsSpeakNext(tok) {
+  if (tok !== ttsToken) return;
+  if (!ttsQueue.length) { ttsActive = false; ttsClearHighlight(); toast('朗读完成'); return; }
+  const cur = ttsQueue.shift();
+  ttsShowHighlight(cur.item);
+  const u = new SpeechSynthesisUtterance(cur.text);
+  u.lang = 'zh-CN';
+  u.rate = state.lib.settings.ttsRate || 1;
+  u.onend = () => ttsSpeakNext(tok);
+  u.onerror = () => ttsSpeakNext(tok);
+  window.speechSynthesis.speak(u);
+}
+
 function toggleReadAloud() {
-  const texts = ((currentPage() && currentPage().texts) || []).map(t => t.text).filter(Boolean).join('。');
   if (ttsActive) {
-    if ('speechSynthesis' in window && !window.speechSynthesis.paused) {
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.pause();
-        toast('已暂停朗读');
-        return;
-      }
-      window.speechSynthesis.cancel();
-      ttsActive = false;
-      toast('已停止朗读');
-      return;
-    }
-    if ('speechSynthesis' in window && window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-      toast('继续朗读');
-      return;
-    }
-    ttsActive = false;
+    const ss = ('speechSynthesis' in window) ? window.speechSynthesis : null;
+    if (ss && !ss.paused && ss.speaking) { ss.pause(); toast('已暂停朗读'); return; }
+    if (ss && ss.paused) { ss.resume(); toast('继续朗读'); return; }
+    ttsToken++; ttsActive = false; ttsQueue = []; ttsClearHighlight();
+    if (ss) ss.cancel();
+    toast('已停止朗读');
     return;
   }
-  if (!texts) { toast('当前页没有文字'); return; }
+  const page = currentPage();
+  const items = ((page && page.texts) || []).filter(t => (t.text || '').trim());
+  if (!items.length) { toast('当前页没有文字'); return; }
   if (!('speechSynthesis' in window)) { toast('此设备不支持朗读'); return; }
-  const u = new SpeechSynthesisUtterance(texts);
-  u.lang = 'zh-CN';
-  u.rate = (state.lib.settings.ttsRate || 1);
-  u.onend = () => { ttsActive = false; };
-  u.onerror = () => { ttsActive = false; };
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
+  ttsQueue = [];
+  for (const item of items) {
+    let sentences = (item.text || '').split(/(?<=[。！？；!?;])/).map(s => s.trim()).filter(Boolean);
+    if (!sentences.length) sentences = [(item.text || '').trim()];
+    for (const s of sentences) ttsQueue.push({ item, text: s });
+  }
+  if (!ttsQueue.length) { toast('当前页没有可朗读文字'); return; }
+  ttsToken++;
+  const tok = ttsToken;
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   ttsActive = true;
+  ttsSpeakNext(tok);
   toast('正在朗读当前页…');
 }
 

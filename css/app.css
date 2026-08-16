@@ -190,6 +190,8 @@ button:disabled { opacity: .35; pointer-events: none; }
 }
 #viewCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .text-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.tts-hl { position: absolute; border-radius: 6px; background: rgba(250,204,21,.32); box-shadow: 0 0 0 1.5px rgba(250,204,21,.55); pointer-events: none; animation: ttsPulse 1.1s ease-in-out infinite; }
+@keyframes ttsPulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
 .text-edit {
   position: absolute; pointer-events: auto;
   background: transparent; border: 1.5px dashed rgba(37,99,235,.55); border-radius: 4px;
