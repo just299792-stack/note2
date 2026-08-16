@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.21';
+const APP_VERSION = '5.22';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -845,6 +845,7 @@ function bindUI() {
     if (act === 'attachments') manageAttachments();
     if (act === 'summarize') summarizeNote();
     if (act === 'insert-template-page') pickTemplateAndInsert();
+    if (act === 'stats') noteStats();
     if (act === 'export-text') exportNoteText();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
@@ -1613,6 +1614,12 @@ function renderNoteList() {
       pin.innerHTML = '<svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/><path d="M12 3v1"/></svg>';
       item.querySelector('.ni-cover').appendChild(pin);
     }
+    if (note.colorTag) {
+      const tag = document.createElement('span');
+      tag.className = 'ni-tag';
+      tag.style.background = note.colorTag;
+      item.querySelector('.ni-text').insertBefore(tag, item.querySelector('.ni-title'));
+    }
     item.querySelector('.ni-title').textContent = note.title;
     item.querySelector('.ni-meta').textContent = `${note.pages.length} 页 · ${d.getMonth() + 1}/${d.getDate()}`;
     item.addEventListener('click', (e) => {
@@ -1637,6 +1644,7 @@ function noteActions(note, anchor) {
     <button class="menu-item" data-act="rename"><svg viewBox="0 0 24 24" class="ic"><path d="M4 20l1.2-4.2L16.5 4.5a2.1 2.1 0 0 1 3 3L8.2 18.8 4 20z"/></svg>重命名</button>
     <button class="menu-item" data-act="color"><svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="9"/></svg>封面颜色</button>
     <button class="menu-item" data-act="emoji"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h16M4 12h16M4 18h16"/></svg>封面符号</button>
+    <button class="menu-item" data-act="tagcolor"><svg viewBox="0 0 24 24" class="ic"><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7z"/></svg>标签颜色</button>
     <button class="menu-item" data-act="pin"><svg viewBox="0 0 24 24" class="ic"><path d="M9 4h6v3l-1.5 2v4l2 2v2h-7v-2l2-2V9L9 7z"/></svg>${note.pinned ? '取消置顶' : '置顶'}</button>
     <button class="menu-item" data-act="multi"><svg viewBox="0 0 24 24" class="ic"><path d="M4 6h4M4 12h4M4 18h4M11 6h9M11 12h9M11 18h9"/></svg>多选</button>
     <button class="menu-item" data-act="copy"><svg viewBox="0 0 24 24" class="ic"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制笔记</button>
@@ -1769,6 +1777,7 @@ function notebookActions(nb, anchor) {
   menu.querySelector('[data-act="rename"]').addEventListener('click', () => { menu.remove(); renameNotebook(nb); });
   menu.querySelector('[data-act="color"]').addEventListener('click', () => { menu.remove(); notebookColor(nb); });
   menu.querySelector('[data-act="emoji"]').addEventListener('click', () => { menu.remove(); noteEmoji(nb); });
+  menu.querySelector('[data-act="tagcolor"]').addEventListener('click', () => { menu.remove(); noteTagColor(note); });
   menu.querySelector('[data-act="del"]').addEventListener('click', () => { menu.remove(); deleteNotebookConfirm(nb); });
   setTimeout(() => document.addEventListener('click', function h(e) { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -2829,6 +2838,42 @@ function pickTemplateAndInsert() {
     if (t) insertTemplatePage(t);
   }));
 }
+const TAG_COLORS = ['#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#a855f7'];
+/* ---------------- 标签颜色 / 笔记统计 ---------------- */
+function noteTagColor(note) {
+  const colors = TAG_COLORS;
+  const body = '<div class="nb-colors">' + colors.map(c => '<button class="nb-color" data-c="' + c + '" style="background:' + c + '"></button>').join('') + '<button class="nb-color off" data-c="">无</button></div>';
+  modalShell('标签颜色', body, [{ label: '取消' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('.nb-color').forEach(b => b.addEventListener('click', () => {
+    note.colorTag = b.dataset.c || null;
+    saveLibrary(state.lib);
+    renderNoteList();
+    toast('已设置标签颜色');
+  }));
+}
+
+function noteStats() {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  let strokes = 0, chars = 0, images = 0;
+  note.pages.forEach(p => {
+    strokes += (p.strokes || []).length;
+    chars += (p.texts || []).reduce((s, t) => s + (t.text || '').length, 0);
+    images += (p.images || []).length;
+  });
+  const recs = (note.attachments || []).filter(x => x.type && x.type.startsWith('audio')).length;
+  modalShell('笔记统计', '<div class="stats-body">' +
+    '<p>页数：' + note.pages.length + '</p>' +
+    '<p>笔画：' + strokes + '</p>' +
+    '<p>文字：' + chars + ' 字</p>' +
+    '<p>图片：' + images + '</p>' +
+    '<p>创建：' + new Date(note.createdAt).toLocaleString('zh-CN') + '</p>' +
+    '<p>更新：' + new Date(note.updatedAt).toLocaleString('zh-CN') + '</p>' +
+    '</div>', [{ label: '关闭' }]);
+}
+
 /* ---------------- 页内查找 / 大纲 / 封面符号（Notability 检索体验） ---------------- */
 function findInNote() {
   const note = currentNote();
@@ -3791,7 +3836,8 @@ async function init() {
     renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote,
-    openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert };
+    openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
+    noteTagColor, noteStats };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }

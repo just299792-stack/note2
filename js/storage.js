@@ -181,6 +181,7 @@ export function sanitize(raw) {
     n.pages = Array.isArray(n.pages) && n.pages.length ? n.pages : [newPage()];
     n.pages = n.pages.map(sanitizePage);
     n.attachments = Array.isArray(n.attachments) ? n.attachments.filter(a => a && a.id && a.name).map(a => ({ id: a.id, name: String(a.name).slice(0,120), size: Number(a.size)||0, type: typeof a.type === 'string' ? a.type : '' })) : [];
+    n.colorTag = typeof n.colorTag === 'string' && ['#ef4444','#f97316','#facc15','#22c55e','#3b82f6','#a855f7'].includes(n.colorTag) ? n.colorTag : null;
   }
   // active 兜底
   const firstNb = lib.subjects[0]?.notebooks[0];

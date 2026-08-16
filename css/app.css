@@ -1143,3 +1143,7 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 @keyframes recPulse { 0%,100% { box-shadow: 0 8px 22px rgba(220,38,38,.45); } 50% { box-shadow: 0 8px 30px rgba(220,38,38,.85), 0 0 0 7px rgba(220,38,38,.16); } }
 .outline-row.lvl2 .ol-text { padding-left: 18px; }
 .outline-row.lvl1 .ol-text { font-weight: 700; }
+
+.ni-tag { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; margin-right: 5px; }
+.nb-color.off { background: var(--bg-elev2); border: 1px dashed var(--border-strong); color: var(--text-2); font-size: 11px; }
+.stats-body p { margin: 7px 0; font-size: 13.5px; color: var(--text); }
