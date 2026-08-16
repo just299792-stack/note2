@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.29';
+const APP_VERSION = '5.30';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2691,6 +2691,26 @@ function openTextPresets() {
 }
 
 /* ---- 演示模式 ---- */
+let presDrawOn = false;
+let presCur = null;
+let presStrokes = [];
+function renderPresMark() {
+  const mk = $('#presMark');
+  const cv = $('#presCanvas');
+  if (!mk || !cv) return;
+  const r = cv.getBoundingClientRect();
+  mk.width = Math.round(r.width);
+  mk.height = Math.round(r.height);
+  const ctx = mk.getContext('2d');
+  ctx.clearRect(0, 0, mk.width, mk.height);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(250,204,21,.55)';
+  ctx.lineWidth = 14;
+  const drawOne = (pts) => { if (!pts || pts.length < 2) return; ctx.beginPath(); pts.forEach((p, i) => { i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); };
+  presStrokes.forEach(drawOne);
+  if (presCur) drawOne(presCur);
+}
+
 function presentMode() {
   const note = currentNote();
   if (!note) { toast('请先打开一个笔记'); return; }
@@ -2714,6 +2734,7 @@ function renderPresPage() {
   renderPageToCanvas(cv, currentPage(), note.paper, Math.round(w * 1.5), currentFont());
   const lz = $('#presLaser');
   if (lz) { lz.width = w; lz.height = h; const lc = lz.getContext('2d'); lc.clearRect(0, 0, w, h); }
+  presStrokes = []; presCur = null; renderPresMark();
   $('#presLabel').textContent = (state.pageIndex + 1) + ' / ' + note.pages.length;
 }
 function drawLaser(e) {
@@ -2741,7 +2762,7 @@ function clearLaser() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, lz.width, lz.height);
 }
-function exitPresent() { $('#presMode').classList.add('hidden'); }
+function exitPresent() { $('#presMode').classList.add('hidden'); presStrokes = []; presCur = null; presDrawOn = false; const pb = $('#presPen'); if (pb) pb.classList.remove('active'); }
 
 /* ---- 自动备份快照 ---- */
 let snapTimer = null;
@@ -2871,14 +2892,30 @@ function bindV426UI() {
   const pClose = $('#presClose'); if (pClose) pClose.addEventListener('click', exitPresent);
   const pCv = $('#presCanvas');
   if (pCv) {
-    pCv.addEventListener('pointermove', drawLaser);
+    pCv.addEventListener('pointerdown', (e) => {
+      if (!presDrawOn) return;
+      const r = pCv.getBoundingClientRect();
+      presCur = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
+      renderPresMark();
+    });
+    pCv.addEventListener('pointermove', (e) => {
+      if (presDrawOn) {
+        if (presCur) { const r = pCv.getBoundingClientRect(); presCur.push({ x: e.clientX - r.left, y: e.clientY - r.top }); renderPresMark(); }
+        return;
+      }
+      drawLaser(e);
+    });
+    pCv.addEventListener('pointerup', () => { if (presCur) { presStrokes.push(presCur); presCur = null; } });
     pCv.addEventListener('pointerleave', clearLaser);
     pCv.addEventListener('click', (e) => {
+      if (presDrawOn) return;
       const r = e.currentTarget.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width;
       if (currentNote()) { if (x < 0.45) switchPage(state.pageIndex - 1); else switchPage(state.pageIndex + 1); renderPresPage(); }
     });
     pCv.addEventListener('dblclick', exitPresent);
+    const pPen = $('#presPen');
+    if (pPen) pPen.addEventListener('click', (e) => { e.stopPropagation(); presDrawOn = !presDrawOn; pPen.classList.toggle('active', presDrawOn); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
   window.addEventListener('pagehide', () => { if (state.lib && state.lib.settings.autoBackup !== false) saveSnapshot(state.lib); });

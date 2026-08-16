@@ -1172,3 +1172,6 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
   backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
 }
 .sel-bar .mini-btn { flex: none; }
+
+#presMark { pointer-events: none; border-radius: 6px; }
+#presPen.active { background: rgba(250,204,21,.35); color: #000; }
