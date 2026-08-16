@@ -25,7 +25,10 @@ export function newLibrary() {
         { id: 'tpl-lecture', name: '听课笔记', paper: { style: 'cornell', color: 'white' }, bg: null, createdAt: 0 },
         { id: 'tpl-meeting', name: '会议记录', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0 },
         { id: 'tpl-todo', name: '待办清单', paper: { style: 'check', color: 'white' }, bg: null, createdAt: 0 },
-        { id: 'tpl-daily', name: '日程计划', paper: { style: 'planner', color: 'white' }, bg: null, createdAt: 0 }
+        { id: 'tpl-daily', name: '日程计划', paper: { style: 'planner', color: 'white' }, bg: null, createdAt: 0 },
+        { id: 'tpl-reading', name: '读书笔记', paper: { style: 'cornell', color: 'cream' }, bg: null, createdAt: 0 },
+        { id: 'tpl-study', name: '学习计划', paper: { style: 'planner', color: 'blue' }, bg: null, createdAt: 0 },
+        { id: 'tpl-errors', name: '错题本', paper: { style: 'line', color: 'white' }, bg: null, createdAt: 0 }
       ],
       theme: 'auto', accent: 'blue', paperZoom: 1, ttsRate: 1, fontFamily: 'system',
       favorites: [], favoritesBar: true,
@@ -212,7 +215,7 @@ function sanitizePage(p) {
     src: im.src, rot: Number(im.rot) || 0
   }));
   if (p.bg && typeof p.bg.src === 'string') {
-    p.bg = { kind: p.bg.kind === 'pdf' ? 'pdf' : 'image', src: p.bg.src, w: Number(p.bg.w) || 816, h: Number(p.bg.h) || 1056 };
+    p.bg = { kind: p.bg.kind === 'pdf' ? 'pdf' : 'image', src: p.bg.src, w: Number(p.bg.w) || 816, h: Number(p.bg.h) || 1056, alpha: Number(p.bg.alpha) >= 0 ? Math.min(1, Number(p.bg.alpha)) : 1 };
   } else delete p.bg;
   return p;
 }

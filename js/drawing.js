@@ -265,8 +265,12 @@ function drawImageItem(ctx, item, w, h) {
 export function drawPageMedia(ctx, page, w, h, onLoaded) {
   if (page.bg && typeof page.bg.src === 'string') {
     const e = imgCache.get(page.bg.src);
-    if (e && e.loaded) ctx.drawImage(e.img, 0, 0, w, h);
-    else loadPageImage(page.bg.src).then((img) => { if (img && onLoaded) onLoaded(); });
+    if (e && e.loaded) {
+      ctx.save();
+      ctx.globalAlpha = page.bg.alpha != null ? Math.min(1, Math.max(0.1, page.bg.alpha)) : 1;
+      ctx.drawImage(e.img, 0, 0, w, h);
+      ctx.restore();
+    } else loadPageImage(page.bg.src).then((img) => { if (img && onLoaded) onLoaded(); });
   }
   for (const item of page.images || []) {
     const e = imgCache.get(item.src);

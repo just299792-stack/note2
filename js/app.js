@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.28';
+const APP_VERSION = '5.29';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1234,6 +1234,23 @@ function renderSettings() {
       b.addEventListener('click', () => { st.fontFamily = v; saveLibrary(state.lib); applySettingsFromLib(state.lib); engine.invalidateRaster(); renderPaperStack(); refreshThumbs(); renderSettings(); });
       fontRow.appendChild(b);
     });
+  }
+  // 背景透明度（当前页有背景时）
+  const bgRow = $('#bgAlphaRow');
+  if (bgRow) {
+    const page = currentPage();
+    const hasBg = !!(page && page.bg && page.bg.src);
+    bgRow.style.display = hasBg ? '' : 'none';
+    const slider = $('#bgAlpha');
+    if (slider && hasBg) {
+      slider.value = String(page.bg.alpha != null ? page.bg.alpha : 1);
+      slider.oninput = () => {
+        page.bg.alpha = Number(slider.value);
+        engine.invalidateRaster();
+        renderPaperStack();
+        saveSoon(true);
+      };
+    }
   }
   // 当前笔记行距
   const spRow = $('#spacingRow');
