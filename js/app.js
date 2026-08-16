@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.48';
+const APP_VERSION = '5.49';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3142,6 +3142,106 @@ async function openSnapshots() {
 }
 
 /* ---- 选中内容：删除 / 复制 / 粘贴 ---- */
+let cropCtx = null;
+
+function finishCrop() {
+  if (!cropCtx) return;
+  const { base, im, stage, boxEl } = cropCtx;
+  const sw = stage.offsetWidth, sh = stage.offsetHeight;
+  if (!sw || !sh) { toast('图片未加载'); return; }
+  const sx = base.width / sw, sy = base.height / sh;
+  const bx = parseFloat(boxEl.style.left) || 0, by = parseFloat(boxEl.style.top) || 0;
+  const bw = parseFloat(boxEl.style.width) || sw, bh = parseFloat(boxEl.style.height) || sh;
+  const cw = Math.max(2, Math.round(bw * sx)), ch = Math.max(2, Math.round(bh * sy));
+  const cx = Math.max(0, Math.round(bx * sx)), cy = Math.max(0, Math.round(by * sy));
+  const cv = document.createElement('canvas');
+  cv.width = cw; cv.height = ch;
+  cv.getContext('2d').drawImage(base, cx, cy, cw, ch, 0, 0, cw, ch);
+  im.src = cv.toDataURL('image/png');
+  im.rot = 0;
+  im.x += (cx / base.width) * im.w;
+  im.y += (cy / base.height) * im.h;
+  im.w *= cw / base.width;
+  im.h *= ch / base.height;
+  closeModal();
+  cropCtx = null;
+  engine.invalidateRaster();
+  renderPaperStack();
+  saveSoon(true);
+  toast('已裁剪图片');
+}
+
+function cropSelection() {
+  const ids = engine.getSelectionIds();
+  const page = currentPage();
+  if (!page) return;
+  const imgs = ids.filter(id => id.startsWith('i:')).map(id => page.images.find(x => x.id === id.slice(2))).filter(Boolean);
+  if (!imgs.length) { toast('选中内容里没有图片'); return; }
+  if (imgs.length > 1) { toast('一次只裁剪一张图片'); return; }
+  const im = imgs[0];
+  const img = new Image();
+  img.onload = () => {
+    let base = img;
+    const rot = (im.rot || 0) % 360;
+    if (rot) {
+      const cv = document.createElement('canvas');
+      const rad = rot * Math.PI / 180;
+      const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      const nw = Math.round(Math.abs(Math.cos(rad)) * w + Math.abs(Math.sin(rad)) * h);
+      const nh = Math.round(Math.abs(Math.sin(rad)) * w + Math.abs(Math.cos(rad)) * h);
+      cv.width = nw; cv.height = nh;
+      const c = cv.getContext('2d');
+      c.translate(nw / 2, nh / 2); c.rotate(rad);
+      c.drawImage(img, -w / 2, -h / 2);
+      base = cv;
+    }
+    const { body } = modalShell('裁剪图片',
+      '<div class="crop-wrap"><div class="crop-stage"><img id="cropImg" alt=""><div id="cropBox" class="crop-box"><span class="crop-h nw"></span><span class="crop-h ne"></span><span class="crop-h sw"></span><span class="crop-h se"></span></div></div></div><div class="crop-tip">拖动框或四角手柄调整裁剪区域</div>',
+      [{ label: '取消' }, { label: '完成', primary: true, action: finishCrop }]);
+    const stage = body.querySelector('.crop-stage');
+    const imgEl = body.querySelector('#cropImg');
+    const boxEl = body.querySelector('#cropBox');
+    imgEl.src = base.src;
+    imgEl.onload = () => {
+      const scale = Math.min(1, 420 / base.width);
+      stage.style.width = (base.width * scale) + 'px';
+      stage.style.height = (base.height * scale) + 'px';
+      imgEl.style.width = (base.width * scale) + 'px';
+      imgEl.style.height = (base.height * scale) + 'px';
+      const pad = 24;
+      boxEl.style.left = pad + 'px'; boxEl.style.top = pad + 'px';
+      boxEl.style.width = Math.max(24, base.width * scale - pad * 2) + 'px';
+      boxEl.style.height = Math.max(24, base.height * scale - pad * 2) + 'px';
+      cropCtx = { base, im, stage, boxEl };
+    };
+    let mode = 'move', drag = null;
+    const onDrag = (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      const sw = stage.offsetWidth, sh = stage.offsetHeight;
+      let l = drag.l, t = drag.t, w = drag.w, h = drag.h;
+      if (mode === 'move') { l = Math.max(0, Math.min(sw - w, drag.l + dx)); t = Math.max(0, Math.min(sh - h, drag.t + dy)); }
+      else if (mode === 'se') { w = Math.max(24, Math.min(sw - l, drag.w + dx)); h = Math.max(24, Math.min(sh - t, drag.h + dy)); }
+      else if (mode === 'nw') { const nl = Math.max(0, Math.min(drag.l + drag.w - 24, drag.l + dx)); const nt = Math.max(0, Math.min(drag.t + drag.h - 24, drag.t + dy)); w = drag.w + (drag.l - nl); h = drag.h + (drag.t - nt); l = nl; t = nt; }
+      else if (mode === 'ne') { w = Math.max(24, Math.min(sw - l, drag.w + dx)); const nt = Math.max(0, Math.min(drag.t + drag.h - 24, drag.t + dy)); h = drag.h + (drag.t - nt); t = nt; }
+      else if (mode === 'sw') { const nl = Math.max(0, Math.min(drag.l + drag.w - 24, drag.l + dx)); w = drag.w + (drag.l - nl); l = nl; h = Math.max(24, Math.min(sh - t, drag.h + dy)); }
+      boxEl.style.left = l + 'px'; boxEl.style.top = t + 'px'; boxEl.style.width = w + 'px'; boxEl.style.height = h + 'px';
+    };
+    const endDrag = () => { drag = null; document.removeEventListener('pointermove', onDrag); document.removeEventListener('pointerup', endDrag); };
+    const startDrag = (e, m) => {
+      e.preventDefault(); e.stopPropagation();
+      mode = m;
+      drag = { x: e.clientX, y: e.clientY, l: parseFloat(boxEl.style.left), t: parseFloat(boxEl.style.top), w: parseFloat(boxEl.style.width), h: parseFloat(boxEl.style.height) };
+      document.addEventListener('pointermove', onDrag);
+      document.addEventListener('pointerup', endDrag);
+    };
+    boxEl.addEventListener('pointerdown', (e) => startDrag(e, 'move'));
+    body.querySelectorAll('.crop-h').forEach(h => h.addEventListener('pointerdown', (e) => startDrag(e, h.classList[1])));
+  };
+  img.onerror = () => toast('图片加载失败');
+  img.src = im.src;
+}
+
 function rotateSelection() {
   const ids = engine.getSelectionIds();
   if (!ids.length) return;
@@ -3209,6 +3309,7 @@ function bindV426UI() {
   const favEdit = $('#favEdit'); if (favEdit) favEdit.addEventListener('click', toggleFavEdit);
   const sCopy = $('#selCopy'); if (sCopy) sCopy.addEventListener('click', () => copySelection());
   const sRot = $('#selRotate'); if (sRot) sRot.addEventListener('click', () => rotateSelection());
+  const sCrop = $('#selCrop'); if (sCrop) sCrop.addEventListener('click', () => cropSelection());
   const sDel = $('#selDel'); if (sDel) sDel.addEventListener('click', () => deleteSelection());
   const sClose = $('#selClose'); if (sClose) sClose.addEventListener('click', () => { $('#selBar').classList.add('hidden'); engine.clearSelection(); });
   const spd = $('#recSpeed');
@@ -4638,7 +4739,7 @@ async function init() {
     insertAttachment, manageAttachments, showWelcomeGuide,
     summarizeNote, insertAIText, speakAIText,
     openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert,
-    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, exportNoteRtf };
+    noteTagColor, noteStats, pickTemplateAndApply, rotateSelection, cropSelection, exportNoteRtf };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
