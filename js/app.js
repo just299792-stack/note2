@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.35';
+const APP_VERSION = '5.36';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3922,6 +3922,11 @@ async function refreshRecList() {
   const listEl = $('#recList');
   if (!note) { listEl.innerHTML = ''; return; }
   const list = await getRecMeta(note.id);
+  const sumEl = $('#recSummary');
+  if (sumEl) {
+    const total = list.reduce((s, x) => s + (x.duration || 0), 0);
+    sumEl.textContent = '共 ' + list.length + ' 段 · 总 ' + (Math.round(total / 60 * 10) / 10) + ' 分钟';
+  }
   listEl.innerHTML = '';
   if (!list.length) {
     listEl.innerHTML = '<div class="rec-empty">还没有录音，点红色按钮开始</div>';
