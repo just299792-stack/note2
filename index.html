@@ -296,11 +296,21 @@
     </div>
     <div class="pres-bar">
       <span id="presLabel">1 / 1</span>
-      <button id="presPen" class="icon-btn sm" title="演示荧光笔">✏️</button>
+      <span id="presClock">0:00</span>
+      <div id="presColors" class="pres-colors" title="批注颜色">
+        <button class="pres-swatch active" data-c="yellow" style="background:#facc15" aria-label="黄色"></button>
+        <button class="pres-swatch" data-c="red" style="background:#ef4444" aria-label="红色"></button>
+        <button class="pres-swatch" data-c="green" style="background:#22c55e" aria-label="绿色"></button>
+        <button class="pres-swatch" data-c="blue" style="background:#3b82f6" aria-label="蓝色"></button>
+        <button class="pres-swatch" data-c="white" style="background:#f8fafc" aria-label="白色"></button>
+      </div>
+      <button id="presPen" class="icon-btn sm" title="演示批注">✏️</button>
       <button id="presPrev" class="icon-btn sm" aria-label="上一页"><svg viewBox="0 0 24 24" class="ic"><path d="M14.5 6l-6 6 6 6"/></svg></button>
+      <button id="presPlay" class="icon-btn sm" title="自动播放" aria-label="自动播放">▶</button>
       <button id="presNext" class="icon-btn sm" aria-label="下一页"><svg viewBox="0 0 24 24" class="ic"><path d="M9.5 6l6 6-6 6"/></svg></button>
       <button id="presClose" class="icon-btn sm" aria-label="退出演示"><svg viewBox="0 0 24 24" class="ic"><path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/></svg></button>
     </div>
+    <div id="presProgress" class="pres-progress"><div id="presProgressFill" class="pres-progress-fill"></div></div>
   </div>
   <button id="btnAI" class="ai-fab" title="AI 助手" aria-label="AI 助手"><svg viewBox="0 0 24 24" class="ic"><path d="M12 3l1.9 4.7L18.5 9.5l-4.6 1.8L12 16l-1.9-4.7L5.5 9.5l4.6-1.8z"/><path d="M18.5 14.5l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z"/></svg></button>
   <div id="aiPanel" class="ai-panel hidden">

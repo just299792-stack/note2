@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.45';
+const APP_VERSION = '5.46';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -2979,6 +2979,12 @@ function openTextPresets() {
 let presDrawOn = false;
 let presCur = null;
 let presStrokes = [];
+let presColor = 'rgba(250,204,21,.55)';
+let presPlaying = false;
+let presTimer = null;
+let presClockTimer = null;
+let presStart = 0;
+const PRES_COLORS = { yellow: 'rgba(250,204,21,.55)', red: 'rgba(239,68,68,.5)', green: 'rgba(34,197,94,.5)', blue: 'rgba(59,130,246,.5)', white: 'rgba(255,255,255,.6)' };
 function renderPresMark() {
   const mk = $('#presMark');
   const cv = $('#presCanvas');
@@ -2989,7 +2995,7 @@ function renderPresMark() {
   const ctx = mk.getContext('2d');
   ctx.clearRect(0, 0, mk.width, mk.height);
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(250,204,21,.55)';
+  ctx.strokeStyle = presColor;
   ctx.lineWidth = 14;
   const drawOne = (pts) => { if (!pts || pts.length < 2) return; ctx.beginPath(); pts.forEach((p, i) => { i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); };
   presStrokes.forEach(drawOne);
@@ -3000,7 +3006,17 @@ function presentMode() {
   const note = currentNote();
   if (!note) { toast('请先打开一个笔记'); return; }
   $('#presMode').classList.remove('hidden');
+  presStart = Date.now();
+  clearInterval(presClockTimer);
+  presClockTimer = setInterval(updatePresClock, 1000);
+  updatePresClock();
   renderPresPage();
+}
+function updatePresClock() {
+  const el = $('#presClock');
+  if (!el) return;
+  const s = Math.floor((Date.now() - presStart) / 1000);
+  el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 function renderPresPage() {
   const note = currentNote();
@@ -3021,6 +3037,8 @@ function renderPresPage() {
   if (lz) { lz.width = w; lz.height = h; const lc = lz.getContext('2d'); lc.clearRect(0, 0, w, h); }
   presStrokes = []; presCur = null; renderPresMark();
   $('#presLabel').textContent = (state.pageIndex + 1) + ' / ' + note.pages.length;
+  const pf = $('#presProgressFill');
+  if (pf) pf.style.width = Math.round(((state.pageIndex + 1) / note.pages.length) * 100) + '%';
 }
 function drawLaser(e) {
   const cv = $('#presCanvas');
@@ -3047,7 +3065,41 @@ function clearLaser() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, lz.width, lz.height);
 }
-function exitPresent() { $('#presMode').classList.add('hidden'); presStrokes = []; presCur = null; presDrawOn = false; const pb = $('#presPen'); if (pb) pb.classList.remove('active'); }
+function exitPresent() {
+  $('#presMode').classList.add('hidden');
+  presStrokes = []; presCur = null; presDrawOn = false; presPlaying = false;
+  clearInterval(presClockTimer); clearTimeout(presTimer);
+  const pb = $('#presPen'); if (pb) pb.classList.remove('active');
+  const pp = $('#presPlay'); if (pp) pp.textContent = '▶';
+}
+function togglePresPlay() {
+  const note = currentNote();
+  if (!note) return;
+  presPlaying = !presPlaying;
+  const pp = $('#presPlay');
+  if (pp) pp.textContent = presPlaying ? '⏸' : '▶';
+  if (presPlaying) presAdvance();
+  else clearTimeout(presTimer);
+}
+function presAdvance() {
+  if (!presPlaying) return;
+  const note = currentNote();
+  if (!note) return;
+  clearTimeout(presTimer);
+  if (state.pageIndex < note.pages.length - 1) {
+    switchPage(state.pageIndex + 1);
+    renderPresPage();
+    presTimer = setTimeout(presAdvance, 5000);
+  } else {
+    presPlaying = false;
+    const pp = $('#presPlay'); if (pp) pp.textContent = '▶';
+  }
+}
+function setPresColor(key) {
+  presColor = PRES_COLORS[key] || presColor;
+  document.querySelectorAll('#presColors .pres-swatch').forEach(b => b.classList.toggle('active', b.dataset.c === key));
+  renderPresMark();
+}
 
 /* ---- 自动备份快照 ---- */
 let snapTimer = null;
@@ -3175,6 +3227,8 @@ function bindV426UI() {
   const pPrev = $('#presPrev'); if (pPrev) pPrev.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex - 1); renderPresPage(); } });
   const pNext = $('#presNext'); if (pNext) pNext.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex + 1); renderPresPage(); } });
   const pClose = $('#presClose'); if (pClose) pClose.addEventListener('click', exitPresent);
+  const pPlay = $('#presPlay'); if (pPlay) pPlay.addEventListener('click', togglePresPlay);
+  const pCols = $('#presColors'); if (pCols) pCols.addEventListener('click', (e) => { const sw = e.target.closest('.pres-swatch'); if (sw) setPresColor(sw.dataset.c); });
   const pCv = $('#presCanvas');
   if (pCv) {
     pCv.addEventListener('pointerdown', (e) => {
