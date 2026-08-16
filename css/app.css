@@ -1109,3 +1109,6 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 .nb-colors { display: flex; flex-wrap: wrap; gap: 10px; padding: 6px 0; }
 .nb-color { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); transition: transform .15s; }
 .nb-color:hover { transform: scale(1.12); }
+
+mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; padding: 0 1px; }
+.ni-snippet { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

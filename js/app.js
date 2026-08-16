@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.12';
+const APP_VERSION = '5.13';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -58,6 +58,7 @@ function settings() {
 /* ---------------- 引擎 ---------------- */
 let twoFingerTurnLock = 0;
 let fitScaleRef = 0;
+let _zoomSaveTimer = 0;
 const engine = new DrawingEngine($('#viewCanvas'), {
   getPage: () => currentPage(),
   getPaper: () => currentNote() ? currentNote().paper : { style: 'line', color: 'white' },
@@ -118,8 +119,14 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     const act = state.lib.settings.threeFingerAction || 'redo';
     if (act === 'redo') redo();
   },
-  onTwoFingerScroll: (dy) => {
-    // 双指上下滑 = 连续滚动纸张
+  onTwoFingerScroll: (dy, dx) => {
+    // 双指左右滑 = 翻页；双指上下滑 = 连续滚动纸张
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (Date.now() - twoFingerTurnLock < 400) return true;
+      twoFingerTurnLock = Date.now();
+      if (dx < 0) switchPage(state.pageIndex + 1); else switchPage(state.pageIndex - 1);
+      return true;
+    }
     const ph = $('#paperHolder');
     if (!ph) return false;
     const before = ph.scrollTop;
@@ -131,6 +138,11 @@ const engine = new DrawingEngine($('#viewCanvas'), {
     if (!fitScaleRef) fitScaleRef = ns;
     const f = Math.max(0.5, Math.min(2.5, ns / fitScaleRef));
     document.documentElement.style.setProperty('--paper-zoom', String(f));
+    if (state.lib && state.lib.settings) {
+      state.lib.settings.paperZoom = Math.round(f * 100) / 100;
+      clearTimeout(_zoomSaveTimer);
+      _zoomSaveTimer = setTimeout(() => saveLibrary(state.lib), 800);
+    }
     engine.fitView();
     fitScaleRef = engine.scale;
     engine.invalidateRaster();
@@ -1141,6 +1153,19 @@ function renderSettings() {
     });
     dp.appendChild(colors);
   }
+  // 当前笔记行距
+  const spRow = $('#spacingRow');
+  if (spRow && currentNote()) {
+    spRow.innerHTML = '';
+    const cur = currentNote().paper.spacing || 'normal';
+    [['tight', '紧'], ['normal', '标准'], ['wide', '宽']].forEach(([v, label]) => {
+      const b = document.createElement('button');
+      b.className = cur === v ? 'active' : '';
+      b.textContent = label;
+      b.addEventListener('click', () => { setSpacing(v); renderSettings(); });
+      spRow.appendChild(b);
+    });
+  }
   // 工具条位置
   const pos = $('#toolbarPos');
   if (pos) {
@@ -1226,6 +1251,23 @@ function renderSettings() {
   const oFav = $('#optFavBar'); if (oFav) oFav.checked = st.favoritesBar !== false;
   const oBak = $('#optAutoBackup'); if (oBak) oBak.checked = st.autoBackup !== false;
   const av = $('#appVersion'); if (av) av.textContent = APP_VERSION;
+}
+
+function setSpacing(spacing) {
+  const note = currentNote();
+  if (!note) return;
+  const before = note.paper.spacing || 'normal';
+  note.paper = Object.assign({}, note.paper, { spacing });
+  if ((before) === spacing) return;
+  const apply = () => {
+    engine.invalidateRaster();
+    renderPaperStack();
+    refreshThumbs();
+    renderSettings();
+  };
+  pushHistory('行距', () => { note.paper = Object.assign({}, note.paper, { spacing: before }); apply(); saveSoon(); }, () => { note.paper = Object.assign({}, note.paper, { spacing }); apply(); saveSoon(); });
+  apply();
+  saveSoon(true);
 }
 
 function setPaper(style, color) {
@@ -1370,6 +1412,21 @@ function renderNoteSortUI() {
   });
 }
 
+function highlightMatch(text, q) {
+  if (!q) return escapeHtml(text);
+  const esc = escapeHtml(text);
+  const low = esc.toLowerCase();
+  const ql = q.toLowerCase();
+  let out = '', i = 0;
+  while (i < esc.length) {
+    const j = low.indexOf(ql, i);
+    if (j < 0) { out += esc.slice(i); break; }
+    out += esc.slice(i, j) + '<mark>' + esc.slice(j, j + q.length) + '</mark>';
+    i = j + q.length;
+  }
+  return out;
+}
+
 function renderGlobalSearch(q) {
   const root = $('#noteList');
   root.innerHTML = '';
@@ -1412,7 +1469,7 @@ function renderGlobalSearch(q) {
   results.forEach(r => {
     const item = document.createElement('div');
     item.className = 'note-item';
-    item.innerHTML = `<div class="ni-title">${escapeHtml(r.note.title)}</div><div class="ni-meta">${escapeHtml(r.subject.name)} / ${escapeHtml(r.notebook.name)}${r.page >= 0 ? ' · 第' + (r.page + 1) + '页' : ''}</div>${r.snippet ? `<div class="ni-snippet">…${escapeHtml(r.snippet)}…</div>` : ''}`;
+    item.innerHTML = `<div class="ni-title">${highlightMatch(r.note.title, q)}</div><div class="ni-meta">${escapeHtml(r.subject.name)} / ${escapeHtml(r.notebook.name)}${r.page >= 0 ? ' · 第' + (r.page + 1) + '页' : ''}</div>${r.snippet ? `<div class="ni-snippet">…${highlightMatch(r.snippet, q)}…</div>` : ''}`;
     item.addEventListener('click', () => openNote(r.note.id, r.notebook.id, r.subject.id, r.page >= 0 ? r.page : 0));
     root.appendChild(item);
   });
@@ -3371,6 +3428,9 @@ async function init() {
   requestAnimationFrame(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); });
   setTimeout(() => { engine.refreshRect(); engine.fitView(); engine.invalidateRaster(); }, 150);
   registerSW();
+  if (state.lib && state.lib.settings && state.lib.settings.paperZoom) {
+    document.documentElement.style.setProperty('--paper-zoom', String(Math.max(0.5, Math.min(2.5, state.lib.settings.paperZoom))));
+  }
   scheduleSnapshot(true);
 
   // 记录首启
@@ -3385,7 +3445,7 @@ async function init() {
     saveCurrentAsTemplate, openTemplateManager, newNoteFromTemplate,
     applyAccent, saveRecTimeline, getRecTimeline,
     toggleReadAloud, exportNoteText, notebookColor,
-    renderLibrary };
+    renderLibrary, setSpacing };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }

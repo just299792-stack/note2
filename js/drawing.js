@@ -21,11 +21,12 @@ const PAPER_INFO = {
 export function paperInfo(color) { return PAPER_INFO[color] || PAPER_INFO.white; }
 
 /* ================= 共享渲染函数 ================= */
-export function drawPaper(ctx, style, color, w, h) {
+export function drawPaper(ctx, style, color, w, h, spacing) {
   const info = paperInfo(color);
   ctx.fillStyle = info.bg;
   ctx.fillRect(0, 0, w, h);
-  const LINE = 48, GRID = 38;
+  const spF = spacing === 'tight' ? 0.85 : spacing === 'wide' ? 1.25 : 1;
+  const LINE = 48 * spF, GRID = 38 * spF;
   if (style === 'line') {
     ctx.strokeStyle = info.line; ctx.lineWidth = 1;
     ctx.beginPath();
@@ -370,7 +371,7 @@ export function renderPageToCanvas(canvas, page, paper, targetW, font) {
   canvas.height = Math.round(PAGE_H * rs);
   const ctx = canvas.getContext('2d');
   ctx.setTransform(rs, 0, 0, rs, 0, 0);
-  const info = drawPaper(ctx, paper.style, paper.color, PAGE_W, PAGE_H);
+  const info = drawPaper(ctx, paper.style, paper.color, PAGE_W, PAGE_H, paper.spacing || 'normal');
   drawPageMedia(ctx, page, PAGE_W, PAGE_H, null);
   for (const st of page.strokes) drawStroke(ctx, st, info, font);
   for (const t of page.texts) drawTextItem(ctx, t, font, PAGE_W, PAGE_H);
@@ -735,8 +736,8 @@ export class DrawingEngine {
     const midDy = mid.y - g.startMid.y;
     const midDx = mid.x - g.startMid.x;
     let scrolled = false;
-    if (Math.abs(midDy) > Math.abs(midDx) && this.cb.onTwoFingerScroll) {
-      scrolled = this.cb.onTwoFingerScroll(midDy);
+    if (this.cb.onTwoFingerScroll && (Math.abs(midDy) > Math.abs(midDx) || Math.abs(midDx) > 40)) {
+      scrolled = this.cb.onTwoFingerScroll(midDy, midDx);
     }
     if (dist > 0 && !scrolled) {
       const ns = Math.max(0.25, Math.min(4, g.scale * (dist / g.dist)));
@@ -939,7 +940,7 @@ export class DrawingEngine {
     this.raster.height = PAGE_H * rs;
     const c = this.rctx;
     c.setTransform(rs, 0, 0, rs, 0, 0);
-    const info = drawPaper(c, paper.style, paper.color, PAGE_W, PAGE_H);
+    const info = drawPaper(c, paper.style, paper.color, PAGE_W, PAGE_H, paper.spacing || 'normal');
     const pid = this.page.id;
     drawPageMedia(c, this.page, PAGE_W, PAGE_H, () => { if (this.page && this.page.id === pid) this.invalidateRaster(); });
     for (const st of this.page.strokes) drawStroke(c, st, info, this.cb.getFont());

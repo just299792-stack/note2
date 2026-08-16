@@ -27,7 +27,7 @@ export function newLibrary() {
         { id: 'tpl-todo', name: '待办清单', paper: { style: 'check', color: 'white' }, bg: null, createdAt: 0 },
         { id: 'tpl-daily', name: '日程计划', paper: { style: 'planner', color: 'white' }, bg: null, createdAt: 0 }
       ],
-      theme: 'auto', accent: 'blue',
+      theme: 'auto', accent: 'blue', paperZoom: 1,
       favorites: [], favoritesBar: true,
       penStyle: 'normal', ballpenStyle: 'normal',
       textPresets: [], autoBackup: true
@@ -134,7 +134,7 @@ export function sanitize(raw) {
     toolbar: 'top', eraserSize: 24, eraserMode: 'stroke',
     defaultPaper: { style: 'line', color: 'white' },
     autoPage: true, twoFingerUndo: true, twoFingerAction: 'undo', threeFingerAction: 'redo', noteSort: 'updated', textSize: 26, templates: [],
-    theme: 'auto', accent: 'blue',
+    theme: 'auto', accent: 'blue', paperZoom: 1,
     favorites: [], favoritesBar: true,
     penStyle: 'normal', ballpenStyle: 'normal',
     textPresets: [], autoBackup: true
@@ -177,7 +177,7 @@ export function sanitize(raw) {
     n.id = n.id || id;
     n.title = typeof n.title === 'string' ? n.title : '未命名笔记';
     n.pinned = !!n.pinned;
-    n.paper = Object.assign({ style: 'line', color: 'white' }, n.paper || {});
+    n.paper = Object.assign({ style: 'line', color: 'white', spacing: 'normal' }, n.paper || {});
     n.pages = Array.isArray(n.pages) && n.pages.length ? n.pages : [newPage()];
     n.pages = n.pages.map(sanitizePage);
   }
