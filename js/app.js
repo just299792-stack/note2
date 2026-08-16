@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.17';
+const APP_VERSION = '5.18';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -157,6 +157,10 @@ const SHAPE_NAMES = { line: '直线', curve: '曲线', polygon: '多边形', ell
 function tryRecognizeShape(st) {
   const det = detectShape(st.points);
   if (!det) return false;
+  // 磁吸到网格：矩形/正方形/圆/椭圆对齐到 38px 网格线
+  if (det.kind === 'rect' || det.kind === 'square' || det.kind === 'circle' || det.kind === 'ellipse') {
+    det.points = det.points.map(pt => ({ x: Math.round(pt.x / 38) * 38, y: Math.round(pt.y / 38) * 38 }));
+  }
   const shapeStroke = { id: st.id, tool: 'pen', shape: det.kind, color: st.color, width: st.width, points: det.points };
   recCapture('stroke', shapeStroke);
   mutate(() => currentPage().strokes.push(shapeStroke), '形状识别');
@@ -771,6 +775,12 @@ function bindUI() {
   $('#btnNewNote').addEventListener('click', createNote);
   const nsEl = $('#noteSearch');
   if (nsEl) nsEl.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderNoteList(); });
+  if (nsEl) nsEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const first = document.querySelector('#noteList .note-item[data-note]');
+      if (first) first.click();
+    }
+  });
   const enEl = $('#btnEmptyNew');
   if (enEl) enEl.addEventListener('click', createNote);
   const mmEl = $('#multiMove'); if (mmEl) mmEl.addEventListener('click', moveSelectedNotes);
@@ -815,6 +825,7 @@ function bindUI() {
     if (act === 'outline') outlineNote();
     if (act === 'insert-attach') $('#attachInput').click();
     if (act === 'attachments') manageAttachments();
+    if (act === 'summarize') summarizeNote();
     if (act === 'export-text') exportNoteText();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
@@ -1491,6 +1502,8 @@ function renderGlobalSearch(q) {
     const item = document.createElement('div');
     item.className = 'note-item';
     item.innerHTML = `<div class="ni-title">${highlightMatch(r.note.title, q)}</div><div class="ni-meta">${escapeHtml(r.subject.name)} / ${escapeHtml(r.notebook.name)}${r.page >= 0 ? ' · 第' + (r.page + 1) + '页' : ''}</div>${r.snippet ? `<div class="ni-snippet">…${highlightMatch(r.snippet, q)}…</div>` : ''}`;
+    item.dataset.note = r.note.id;
+    item.dataset.nb = r.notebook.id;
     item.addEventListener('click', () => openNote(r.note.id, r.notebook.id, r.subject.id, r.page >= 0 ? r.page : 0));
     root.appendChild(item);
   });
@@ -2957,6 +2970,53 @@ function showWelcomeGuide() {
     '<p>✨ 右下角 AI 助手可结合笔记提问</p>' +
     '</div>', [{ label: '开始使用', primary: true }]);
 }
+/* ---------------- AI 一键总结笔记 ---------------- */
+async function summarizeNote() {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  const parts = [];
+  note.pages.forEach((p, i) => {
+    const ts = (p.texts || []).map(t => t.text).filter(Boolean);
+    if (ts.length) parts.push('【第' + (i + 1) + '页】' + ts.join(' '));
+  });
+  const content = parts.join('\n').slice(0, 4000);
+  if (!content) { toast('笔记中没有文字内容'); return; }
+  toast('正在生成总结…');
+  const msgs = [
+    { role: 'system', content: '你是「笔记」里的 AI 学习助手。请用简洁、有条理的中文总结下面笔记的要点，控制在 300 字以内，用要点列出。' },
+    { role: 'user', content }
+  ];
+  try {
+    const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: msgs, stream: true }) });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); toast('总结失败：' + (d.error || res.status)); return; }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', answer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const segs = buf.split('\n\n');
+      buf = segs.pop();
+      for (const seg of segs) {
+        const line = seg.trim();
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const obj = JSON.parse(payload);
+          let delta = '';
+          if (typeof obj.delta === 'string') delta = obj.delta;
+          else if (obj.choices && obj.choices[0] && obj.choices[0].delta && typeof obj.choices[0].delta.content === 'string') delta = obj.choices[0].delta.content;
+          if (delta) answer += delta;
+        } catch (_) {}
+      }
+    }
+    modalShell('AI 总结', '<div class="ai-summary">' + escapeHtml(answer || '（未生成）').replace(/\n/g, '<br>') + '</div>', [{ label: '关闭' }]);
+  } catch (e) {
+    toast('总结失败：请确认服务器已启动并联网');
+  }
+}
 /* ---------------- AI 助手（DeepSeek，经本地服务器代理） ---------------- */
 let aiHistory = [];
 let aiBusy = false;
@@ -3656,7 +3716,8 @@ async function init() {
     applyAccent, saveRecTimeline, getRecTimeline,
     toggleReadAloud, exportNoteText, notebookColor,
     renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
-    insertAttachment, manageAttachments, showWelcomeGuide };
+    insertAttachment, manageAttachments, showWelcomeGuide,
+    summarizeNote };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }

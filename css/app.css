@@ -1136,3 +1136,5 @@ mark { background: rgba(250,204,21,.55); color: inherit; border-radius: 2px; pad
 .att-row .mini-btn { flex: none; }
 .welcome-body p { margin: 8px 0; font-size: 14px; color: var(--text); line-height: 1.6; }
 .welcome-body p:first-child { margin-top: 4px; }
+
+.ai-summary { font-size: 14px; line-height: 1.7; color: var(--text); max-height: 60vh; overflow-y: auto; }
