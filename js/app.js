@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.78';
+const APP_VERSION = '5.79';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4016,11 +4016,13 @@ function noteStats() {
     images += (p.images || []).length;
   });
   const recs = (note.attachments || []).filter(x => x.type && x.type.startsWith('audio')).length;
+  const attachs = (note.attachments || []).length;
   modalShell('笔记统计', '<div class="stats-body">' +
     '<p>页数：' + note.pages.length + '</p>' +
     '<p>笔画：' + strokes + '</p>' +
-    '<p>文字：' + chars + ' 字</p>' +
+    '<p>文字：' + chars + ' 字' + (note.pages.length ? '（平均每页 ' + Math.round(chars / note.pages.length) + ' 字）' : '') + '</p>' +
     '<p>图片：' + images + '</p>' +
+    '<p>录音：' + recs + ' 段 · 附件：' + attachs + ' 个</p>' +
     '<p>创建：' + new Date(note.createdAt).toLocaleString('zh-CN') + '</p>' +
     '<p>更新：' + new Date(note.updatedAt).toLocaleString('zh-CN') + '</p>' +
     '</div>', [{ label: '关闭' }]);
