@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.77';
+const APP_VERSION = '5.78';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -4528,6 +4528,7 @@ function speakAIText(text) {
 function bindAIUI() {
   const fab = $('#btnAI'); if (fab) fab.addEventListener('click', toggleAIPanel);
   const close = $('#aiClose'); if (close) close.addEventListener('click', () => $('#aiPanel').classList.add('hidden'));
+  const clear = $('#aiClear'); if (clear) clear.addEventListener('click', () => { aiHistory = []; $('#aiMsgs').innerHTML = ''; appendAIMsg('assistant', '已清空对话，可以开始新提问。'); });
   const send = $('#aiSend'); if (send) send.addEventListener('click', sendAIMessage);
   const input = $('#aiInput');
   if (input) input.addEventListener('keydown', (e) => {
