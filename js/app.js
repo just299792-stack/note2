@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.91';
+const APP_VERSION = '5.92';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3357,6 +3357,26 @@ function exitPresent() {
   const pb = $('#presPen'); if (pb) pb.classList.remove('active');
   const pp = $('#presPlay'); if (pp) pp.textContent = '▶';
 }
+function savePresMarks() {
+  if (!presStrokes.length) { toast('还没有批注'); return; }
+  const page = currentPage();
+  const cv = $('#presCanvas');
+  if (!page || !cv) return;
+  const r = cv.getBoundingClientRect();
+  const pW = pageW(), pH = pageH();
+  const sx = pW / r.width, sy = pH / r.height;
+  const strokes = presStrokes.map(pts => ({
+    id: 's' + Math.random().toString(36).slice(2, 10),
+    tool: 'highlighter', color: presColor, width: 14,
+    points: pts.map(p => ({ x: p.x * sx, y: p.y * sy, p: 0.5 }))
+  }));
+  mutate(() => { page.strokes.push(...strokes); }, '保存演示批注');
+  presStrokes = [];
+  renderPresMark();
+  saveSoon(true);
+  toast('已保存 ' + strokes.length + ' 笔批注到页面');
+}
+
 function togglePresPlay() {
   const note = currentNote();
   if (!note) return;
@@ -3726,6 +3746,7 @@ function bindV426UI() {
     pCv.addEventListener('dblclick', exitPresent);
     const pPen = $('#presPen');
     if (pPen) pPen.addEventListener('click', (e) => { e.stopPropagation(); presDrawOn = !presDrawOn; pPen.classList.toggle('active', presDrawOn); });
+    const pSave = $('#presSave'); if (pSave) pSave.addEventListener('click', savePresMarks);
     const pClearMark = $('#presClearMark'); if (pClearMark) pClearMark.addEventListener('click', () => { presStrokes = []; presCur = null; renderPresMark(); toast('已清除批注'); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#presMode') && !$('#presMode').classList.contains('hidden')) exitPresent(); });
@@ -5248,7 +5269,7 @@ async function init() {
   // 调试句柄（供测试/排查使用）
   window.__note2 = { state, engine, addPage, duplicatePage, deletePage, openNote, deleteNote, switchPage, setPaper, exportNote, exportPdf, handleImport,
     rec: { toggleRecording, stopRecording, playRecording, stopPlayback, refreshRecList, clearAllRecordings },
-    renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
+    renderFavorites, insertImage, openScanner, addScanFile, importPdf, setPageSize, presentMode, savePresMarks, openSnapshots, openTextPresets, saveSnapshot, listSnapshots, loadSnapshot, deleteSnapshot,
     buildWave, drawWave, saveAudioBlob, saveRecMeta,
     addFavorite, toggleFavEdit, deleteSelection, copySelection, pasteSelection, copySelectionText, selectAllPage, pinSelectedNotes, tagSelectedNotes,
     deletePageAt, clearBlankPages,
