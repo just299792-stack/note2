@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.20';
+const APP_VERSION = '5.21';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -790,7 +790,7 @@ function bindUI() {
   $('#recClose').addEventListener('click', () => { $('#recPanel').classList.add('hidden'); stopPlayback(); });
   $('#recToggle').addEventListener('click', toggleRecording);
   $('#btnRec').classList.toggle('hidden', !state.recSupported);
-  $('#btnNewNote').addEventListener('click', createNote);
+  $('#btnNewNote').addEventListener('click', openNewNoteMenu);
   const nsEl = $('#noteSearch');
   if (nsEl) nsEl.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderNoteList(); });
   if (nsEl) nsEl.addEventListener('keydown', (e) => {
@@ -844,6 +844,7 @@ function bindUI() {
     if (act === 'insert-attach') $('#attachInput').click();
     if (act === 'attachments') manageAttachments();
     if (act === 'summarize') summarizeNote();
+    if (act === 'insert-template-page') pickTemplateAndInsert();
     if (act === 'export-text') exportNoteText();
     if (act === 'snapshots') openSnapshots();
     if (act === 'text-presets') openTextPresets();
@@ -2789,6 +2790,45 @@ async function exportNoteText() {
   const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
   await shareOrDownload(blob, safeName(note.title) + '.txt');
 }
+/* ---------------- 模板化新建（Notability 新建流程） ---------------- */
+function openNewNoteMenu() {
+  const tpls = state.lib.settings.templates || [];
+  const body = '<button class="menu-item" data-new="blank">空白笔记</button>' +
+    (tpls.length ? tpls.map(t => `<button class="menu-item" data-new="${t.id}"><span class="tpl-preview" style="background:${paperInfo(t.paper.color).bg}"></span>${escapeHtml(t.name)}</button>`).join('') : '');
+  modalShell('新建笔记', body, [{ label: '取消' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (!mask) return;
+  mask.querySelectorAll('[data-new]').forEach(b => b.addEventListener('click', () => {
+    closeModal();
+    if (b.dataset.new === 'blank') createNote();
+    else {
+      const t = state.lib.settings.templates.find(x => x.id === b.dataset.new);
+      if (t) newNoteFromTemplate(t);
+    }
+  }));
+}
+
+function insertTemplatePage(tpl) {
+  const note = currentNote();
+  if (!note) { toast('请先打开一个笔记'); return; }
+  addPage();
+  const p = currentPage();
+  if (p && tpl.bg) p.bg = JSON.parse(JSON.stringify(tpl.bg));
+  toast('已插入模板页');
+}
+
+function pickTemplateAndInsert() {
+  const tpls = (state.lib.settings.templates || []).filter(t => t.bg);
+  if (!tpls.length) { toast('还没有带背景的模板，可先把当前页存为模板'); return; }
+  const body = tpls.map(t => `<button class="menu-item" data-tpl="${t.id}"><span class="tpl-preview" style="background:${paperInfo(t.paper.color).bg}"></span>${escapeHtml(t.name)}</button>`).join('');
+  modalShell('插入模板页', body, [{ label: '取消' }]);
+  const mask = document.querySelector('#modalRoot .modal-mask');
+  if (mask) mask.querySelectorAll('[data-tpl]').forEach(b => b.addEventListener('click', () => {
+    const t = state.lib.settings.templates.find(x => x.id === b.dataset.tpl);
+    closeModal();
+    if (t) insertTemplatePage(t);
+  }));
+}
 /* ---------------- 页内查找 / 大纲 / 封面符号（Notability 检索体验） ---------------- */
 function findInNote() {
   const note = currentNote();
@@ -3750,7 +3790,8 @@ async function init() {
     toggleReadAloud, exportNoteText, notebookColor,
     renderLibrary, setSpacing, findInNote, outlineNote, noteEmoji,
     insertAttachment, manageAttachments, showWelcomeGuide,
-    summarizeNote };
+    summarizeNote,
+    openNewNoteMenu, insertTemplatePage, pickTemplateAndInsert };
   window.__addPage = addPage;
   window.__duplicatePage = duplicatePage;
 }
