@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.39';
+const APP_VERSION = '5.40';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3982,8 +3982,10 @@ async function refreshRecList() {
         <canvas class="rec-wave" data-wave="${escapeHtml(item.id)}" width="120" height="28"></canvas>
       </div>
       <span class="rec-dur">${fmtTime(item.duration)}</span>
+      <button class="rec-exp" data-exp="${escapeHtml(item.id)}" aria-label="导出"><svg viewBox="0 0 24 24" class="ic"><path d="M12 4v11M7.5 10.5L12 6l4.5 4.5M5 19h14"/></svg></button>
       <button class="rec-del" data-del="${escapeHtml(item.id)}" aria-label="删除"><svg viewBox="0 0 24 24" class="ic"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>`;
     row.querySelector('.rec-play').addEventListener('click', () => playRecording(item, 0));
+    row.querySelector('.rec-exp').addEventListener('click', () => exportRecording(item));
     row.querySelector('.rec-del').addEventListener('click', () => deleteRecording(item));
     const cv = row.querySelector('.rec-wave');
     cv.addEventListener('click', (e) => {
@@ -4083,6 +4085,18 @@ async function deleteRecording(item) {
   refreshRecList();
   toast('已删除录音');
 }
+
+  // 导出录音音频文件（支持 iPadOS 分享/下载）
+  async function exportRecording(item) {
+    const note = currentNote();
+    if (!note) return;
+    const blob = await getAudioBlob('audio:' + note.id + ':' + item.id);
+    if (!blob) { toast('音频文件不存在'); return; }
+    const type = (blob.type || '').toLowerCase();
+    const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+    const fname = safeName(note.title) + ' - ' + item.name + '.' + ext;
+    try { await shareOrDownload(blob, fname); } catch (_) { download(blob, fname); }
+  }
 
 /* ---------------- 恢复默认设置 ---------------- */
 function resetSettings() {

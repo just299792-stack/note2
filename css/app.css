@@ -573,6 +573,8 @@ body.toolbar-bottom .tool-btn { padding: 7px 10px 5px; }
 }
 .rec-item .rec-name { flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rec-item .rec-dur { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rec-item .rec-exp { color: var(--text-3); padding: 6px; border-radius: 8px; }
+.rec-item .rec-exp:hover { color: var(--accent); background: rgba(96,165,250,.12); }
 .rec-item .rec-del { color: var(--text-3); padding: 6px; border-radius: 8px; }
 .rec-item .rec-del:hover { color: var(--danger); background: rgba(220,38,38,.1); }
 .rec-empty { font-size: 12.5px; color: var(--text-3); text-align: center; padding: 14px 0; }
