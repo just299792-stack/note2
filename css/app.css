@@ -758,6 +758,9 @@ button, .tool-btn, .icon-btn, .mini-btn, .menu-item, .note-item, .page-thumb, .r
 }
 
 /* ============ v4.26?????? / ?? / ?? / ?? / ???? / ?? / ?? ============ */
+body.markup-mode .paper-stack .paper-slot:not(.current) { display: none; }
+body.markup-mode #paperHolder { overflow: hidden; }
+body.markup-mode .paper-stack { justify-content: center; }
 .note-tabs {
   display: flex; align-items: center; gap: 5px; padding: 6px 10px 0; overflow-x: auto;
   flex: none; min-height: 34px; scrollbar-width: none;

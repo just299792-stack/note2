@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.49';
+const APP_VERSION = '5.50';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -1162,6 +1162,14 @@ function setPageSize(size) {
   toast('已切换纸张大小：' + target.name);
 }
 
+function toggleMarkupMode(on) {
+  state.lib.settings.markup = !!on;
+  document.body.classList.toggle('markup-mode', !!on);
+  renderPaperStack();
+  engine.resize();
+  saveLibrary(state.lib);
+}
+
 function updatePaperUI() {
   const note = currentNote();
   if (!note) return;
@@ -1512,6 +1520,7 @@ function renderSettings() {
   }
   const oFav = $('#optFavBar'); if (oFav) oFav.checked = st.favoritesBar !== false;
   const oBak = $('#optAutoBackup'); if (oBak) oBak.checked = st.autoBackup !== false;
+  const oMarkup = $('#optMarkup'); if (oMarkup) oMarkup.checked = st.markup === true;
   const av = $('#appVersion'); if (av) av.textContent = APP_VERSION;
 }
 
@@ -3325,6 +3334,7 @@ function bindV426UI() {
   const attIn = $('#attachInput'); if (attIn) attIn.addEventListener('change', async (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) await insertAttachment(f); });
   const oFav = $('#optFavBar'); if (oFav) oFav.addEventListener('change', (e) => { state.lib.settings.favoritesBar = e.target.checked; saveLibrary(state.lib); renderFavorites(); });
   const oBak = $('#optAutoBackup'); if (oBak) oBak.addEventListener('change', (e) => { state.lib.settings.autoBackup = e.target.checked; saveLibrary(state.lib); if (e.target.checked) scheduleSnapshot(true); });
+  const oMarkup = $('#optMarkup'); if (oMarkup) oMarkup.addEventListener('change', (e) => toggleMarkupMode(e.target.checked));
   const pPrev = $('#presPrev'); if (pPrev) pPrev.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex - 1); renderPresPage(); } });
   const pNext = $('#presNext'); if (pNext) pNext.addEventListener('click', () => { if (currentNote()) { switchPage(state.pageIndex + 1); renderPresPage(); } });
   const pClose = $('#presClose'); if (pClose) pClose.addEventListener('click', exitPresent);
@@ -4314,6 +4324,7 @@ async function logout(showToastMsg) {
 
 function applySettingsFromLib(lib) {
   if (!lib) return;
+  document.body.classList.toggle('markup-mode', lib.settings.markup === true);
   state.color = lib.settings.color || '#1e293b';
   state.colors.pen = lib.settings.color || '#1e293b';
   state.colors.highlighter = lib.settings.hlColor || '#fde047';
