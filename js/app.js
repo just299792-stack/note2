@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.1';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -175,7 +175,7 @@ const engine = new DrawingEngine($('#viewCanvas'), {
       clearTimeout(_zoomSaveTimer);
       _zoomSaveTimer = setTimeout(() => saveLibrary(state.lib), 800);
     }
-    engine.fitView();
+    engine.resize();
     fitScaleRef = engine.scale;
     engine.invalidateRaster();
   }
@@ -575,7 +575,7 @@ function switchPage(i) {
   state.pageIndex = i;
   engine.setPage(currentPage());
   pageFade();
-  engine.fitView();
+  engine.resize();
   engine.invalidateRaster();
   renderPages();
   renderPaperStack();
