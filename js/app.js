@@ -8,7 +8,7 @@ import { newId, newLibrary, newNote, newPage, loadLibrary, saveLibrary, loadLoca
 import { DrawingEngine, PAGE_W, PAGE_H, renderPageToCanvas, paperInfo } from './drawing.js';
 import { canvasesToPdf } from './pdf.js';
 
-const APP_VERSION = '5.99';
+const APP_VERSION = '6.0';
 const $ = (s) => document.querySelector(s);
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
 
@@ -3846,6 +3846,7 @@ function bindV426UI() {
     ph.addEventListener('wheel', (e) => {
       e.preventDefault();
       ph.scrollTop += e.deltaY;
+      ph.scrollLeft += e.deltaX;
     }, { passive: false });
     // 单指拖动滚动：手指在纸张上直接滑（中间区域），Apple Pencil 仍书写
     let oneFinger = null;
@@ -3855,11 +3856,12 @@ function bindV426UI() {
       const r = ph.getBoundingClientRect();
       const x = e.clientX - r.left;
       if (x < r.width * 0.12 || x > r.width * 0.88) return;
-      oneFinger = { id: e.pointerId, y0: e.clientY, st0: ph.scrollTop };
+      oneFinger = { id: e.pointerId, x0: e.clientX, y0: e.clientY, st0: ph.scrollTop, sl0: ph.scrollLeft };
     }, true);
     ph.addEventListener('pointermove', (e) => {
       if (!oneFinger || oneFinger.id !== e.pointerId) return;
       ph.scrollTop = oneFinger.st0 - (e.clientY - oneFinger.y0);
+      ph.scrollLeft = oneFinger.sl0 - (e.clientX - oneFinger.x0);
     }, true);
     ph.addEventListener('pointerup', () => { oneFinger = null; }, true);
     ph.addEventListener('pointercancel', () => { oneFinger = null; }, true);

@@ -185,8 +185,9 @@ button:disabled { opacity: .35; pointer-events: none; }
 /* ---------------- 画布区 ---------------- */
 .canvas-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: var(--bg); }
 .paper-holder {
-  flex: 1; position: relative; overflow: hidden; touch-action: none;
+  flex: 1; position: relative; overflow: auto; touch-action: none;
   display: flex; align-items: center; justify-content: center;
+  scrollbar-width: thin;
 }
 #viewCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
 .text-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
@@ -1129,20 +1130,21 @@ body.fav-editing .fav-chip:hover { background: rgba(220,38,38,.12); color: #dc26
 .paper-holder {
   display: block;
   overflow-y: auto;
-  overflow-x: hidden;
-  touch-action: pan-y;
+  overflow-x: auto;
+  touch-action: pan-x pan-y;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   background: #16181d !important;
 }
 .paper-stack {
   display: flex !important;
-  flex-direction: column; align-items: center; gap: 0;
+  flex-direction: column; align-items: flex-start; gap: 0;
   padding: 28px 0 90px; min-height: 100%;
 }
 :root { --paper-zoom: 1; }
 .paper-slot {
   position: relative; width: calc(min(96%, 780px) * var(--paper-zoom, 1)); flex: none;
+  margin-left: auto; margin-right: auto;
   aspect-ratio: 816 / 1056;
   border-radius: 0; overflow: hidden;
   background: #fffefb; box-shadow: none;

@@ -821,20 +821,20 @@ export class DrawingEngine {
       move = Math.max(move, Math.hypot(pts[i].x - sp.x, pts[i].y - sp.y));
     }
     if (move > g.maxMove) g.maxMove = move;
+    const distRatio = g.dist > 0 ? dist / g.dist : 1;
     const midDy = mid.y - g.startMid.y;
     const midDx = mid.x - g.startMid.x;
-    let scrolled = false;
-    if (this.cb.onTwoFingerScroll && (Math.abs(midDy) > Math.abs(midDx) || Math.abs(midDx) > 40)) {
-      scrolled = this.cb.onTwoFingerScroll(midDy, midDx);
-    }
-    if (dist > 0 && !scrolled) {
-      const ns = Math.max(0.25, Math.min(4, g.scale * (dist / g.dist)));
+    // 捻合/张开优先缩放，并跟随双指中点平移；距离不变时才滚动/翻页
+    if (Math.abs(distRatio - 1) > 0.03) {
+      const ns = Math.max(0.25, Math.min(4, g.scale * distRatio));
       this.scale = ns;
       const wmx = (g.mid.x - g.ox) / g.scale;
       const wmy = (g.mid.y - g.oy) / g.scale;
       this.ox = mid.x - wmx * ns;
       this.oy = mid.y - wmy * ns;
       if (this.cb.onZoom) this.cb.onZoom(this.scale);
+    } else if (this.cb.onTwoFingerScroll && move > 6) {
+      this.cb.onTwoFingerScroll(midDy, midDx);
     }
     this.dirtyView = true;
     this.requestFrame();
